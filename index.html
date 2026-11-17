@@ -60,6 +60,8 @@ const TIPOS = {
   soldado:  { r: 6,  hp: 40,  vel: 52,  cuerpo: '#7a2a2a', casco: '#4a1616', rango: 170, cad: [1.1, 1.8], dmg: 7, perd: 1, disp: 0.09, vbala: 230, pts: 100, arma: 8 },
   corredor: { r: 5,  hp: 26,  vel: 100, cuerpo: '#a0522d', casco: '#5c2a12', melee: 14, pts: 75, arma: 3 },
   pesado:   { r: 8,  hp: 130, vel: 36,  cuerpo: '#4a4a52', casco: '#6a1a1a', rango: 110, cad: [1.4, 2.0], dmg: 6, perd: 4, disp: 0.3, vbala: 210, pts: 200, arma: 9 },
+  francotirador: { r: 6, hp: 35, vel: 38, cuerpo: '#3a4a2a', casco: '#2a3018', rango: 320, cad: [2.6, 3.6], dmg: 22, perd: 1, disp: 0.02, vbala: 460, pts: 150, arma: 14, sniper: true },
+  perro:    { r: 4,  hp: 18,  vel: 135, cuerpo: '#6a4a2a', casco: '#4a3018', melee: 9, pts: 60, arma: 0, perro: true },
   jefe:     { r: 10, hp: 700, vel: 40,  cuerpo: '#2a1a2e', casco: '#8a1010', rango: 160, cad: [0.6, 0.9], dmg: 8, perd: 3, disp: 0.15, vbala: 250, pts: 1500, arma: 11, jefe: true },
 };
 
@@ -147,6 +149,7 @@ const Snd = {
       case 'racha': [523, 659, 784, 1046].forEach((f, i) => this.tono('square', f, f, 0.1, 0.12, i * 0.08)); break;
       case 'jet': this.ruido(1.6, 0.4, 300, 3000, 0, 'bandpass'); break;
       case 'helice': this.ruido(0.06, 0.12 * v, 500, 200); break;
+      case 'ladrido': this.tono('square', 420, 250, 0.07, 0.15 * v); this.tono('square', 450, 260, 0.07, 0.15 * v, 0.12); break;
       case 'click': this.tono('square', 600, 600, 0.04, 0.1); break;
       case 'victoria': [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => this.tono('square', f, f, 0.18, 0.12, i * 0.14)); break;
       case 'derrota': [392, 330, 262, 196].forEach((f, i) => this.tono('triangle', f, f * 0.98, 0.35, 0.2, i * 0.3)); break;
@@ -368,14 +371,81 @@ let heli = null, S = { dron: false, aereo: false, torreta: false };
 let record = 0;
 try { record = +localStorage.getItem('faro_record') || 0; } catch (e) {}
 
+// ---------- Perfil: experiencia, nivel y camuflajes (se guarda en el navegador) ----------
+let PERFIL = { xp: 0, camo: 0 };
+try { PERFIL = { ...PERFIL, ...JSON.parse(localStorage.getItem('faro_perfil') || '{}') }; } catch (e) {}
+let recordSup = 0; try { recordSup = +localStorage.getItem('faro_record_sup') || 0; } catch (e) {}
+const guardarPerfil = () => { try { localStorage.setItem('faro_perfil', JSON.stringify(PERFIL)); } catch (e) {} };
+const NIVEL_MAX = 10;
+const xpTotal = n => 400 * (n - 1) * n;            // XP total para llegar al nivel n
+const nivelActual = () => { let n = 1; while (n < NIVEL_MAX && PERFIL.xp >= xpTotal(n + 1)) n++; return n; };
+const PREMIOS = { 2: '+10 VIDA MÁXIMA', 3: 'CAMUFLAJE DESIERTO', 4: 'FUSIL +15% DAÑO', 5: '+1 GRANADA AL EMPEZAR',
+  6: 'CAMUFLAJE NIEVE', 7: '+10 VIDA MÁXIMA', 8: 'ESCOPETA +2 PERDIGONES', 9: 'CAMUFLAJE NOCHE', 10: '+15 VIDA Y CAMUFLAJE DORADO' };
+const CAMOS = [
+  { n: 'BOSQUE', nivel: 1, c: '#3f7a3a', h: '#2e5a2b' }, { n: 'DESIERTO', nivel: 3, c: '#a08a55', h: '#7a6a3a' },
+  { n: 'NIEVE', nivel: 6, c: '#c8ccd0', h: '#8a9098' }, { n: 'NOCHE', nivel: 9, c: '#2a3550', h: '#1a2238' },
+  { n: 'DORADO', nivel: 10, c: '#d4a830', h: '#a07818' }];
+function maxVida() { const n = nivelActual(); return 100 + (n >= 2 ? 10 : 0) + (n >= 7 ? 10 : 0) + (n >= 10 ? 15 : 0) + (G && G.mej && G.mej.chaleco ? 25 : 0); }
+function mulDanio(arma) { if (arma !== 1) return 1; return (nivelActual() >= 4 ? 1.15 : 1) * (1 + 0.2 * (G.mej ? G.mej.fusil : 0)); }
+function extraPerdigones(arma) { if (arma !== 2) return 0; return (nivelActual() >= 8 ? 2 : 0) + 2 * (G.mej ? G.mej.escopeta : 0); }
+function ganarXp(x) {
+  const antes = nivelActual(); PERFIL.xp += Math.round(x); const ahora = nivelActual();
+  if (ahora > antes) {
+    banner(`¡NIVEL ${ahora}!`, 'Desbloqueaste: ' + PREMIOS[ahora], 3.5); Snd.play('victoria');
+    if (P) { P.maxhp = maxVida(); P.hp = P.maxhp; }
+  }
+  guardarPerfil();
+}
+function cambiarCamo() {
+  const n = nivelActual(); let i = PERFIL.camo;
+  do { i = (i + 1) % CAMOS.length; } while (CAMOS[i].nivel > n);
+  PERFIL.camo = i; guardarPerfil();
+}
+
+// ---------- Tienda entre zonas ----------
+const TIENDA = [
+  { id: 'muni', n: 'MUNICIÓN LLENA', d: 'Fusil 180 · Escopeta 30', p: 300, f: () => { P.mun[1].res = Math.max(P.mun[1].res, 180); P.mun[2].res = Math.max(P.mun[2].res, 30); } },
+  { id: 'gran', n: '+2 GRANADAS', d: 'Máximo 6', p: 400, f: () => { P.gran = Math.min(6, P.gran + 2); } },
+  { id: 'vida', n: 'BOTIQUÍN', d: 'Vida al máximo', p: 250, f: () => { P.hp = P.maxhp; } },
+  { id: 'chaleco', n: 'CHALECO', d: '+25 vida máxima', p: 1200, max: 1, f: () => { G.mej.chaleco = 1; P.maxhp = maxVida(); P.hp = P.maxhp; } },
+  { id: 'fusil', n: 'FUSIL MEJORADO', d: '+20% de daño', p: 1500, max: 2, f: () => { G.mej.fusil++; } },
+  { id: 'escopeta', n: 'ESCOPETA MEJORADA', d: '+2 perdigones', p: 1500, max: 2, f: () => { G.mej.escopeta++; } },
+];
+const creditos = () => G.pts - G.gastado;
+function abrirTienda() { G.estado = 'tienda'; mouse.abajo = false; Snd.play('item'); }
+function comprar(it) {
+  const veces = G.compras[it.id] || 0;
+  if (creditos() < it.p || (it.max && veces >= it.max)) { Snd.play('vacio'); return; }
+  G.gastado += it.p; G.compras[it.id] = veces + 1; it.f(); Snd.play('item');
+}
+function dibujarTienda() {
+  caja(0, 0, VW, VH, 0.85);
+  txt('TIENDA DEL ESCUADRÓN', VW / 2, 10, 11, '#ffe060', 'center');
+  txt(`PUNTOS PARA GASTAR: ${creditos()}`, VW / 2, 28, 7, '#80ff80', 'center');
+  const w = Math.min(190, (VW - 40) / 2), x0 = VW / 2 - w - 4;
+  TIENDA.forEach((it, i) => {
+    const x = x0 + (i % 2) * (w + 8), y = 44 + Math.floor(i / 2) * 50, h = 44;
+    const veces = G.compras[it.id] || 0, agotado = it.max && veces >= it.max, puede = !agotado && creditos() >= it.p;
+    const hover = !touch.activo && mouse.x >= x && mouse.x <= x + w && mouse.y >= y && mouse.y <= y + h;
+    ctx.fillStyle = hover && puede ? '#3a3a48' : 'rgba(20,20,30,0.9)'; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = puede ? '#ffe060' : '#444'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    txt(it.n, x + 6, y + 6, 7, puede ? '#ffffff' : '#777', 'left', w - 12);
+    txt(it.d, x + 6, y + 18, 5, puede ? '#c0c8b8' : '#666', 'left', w - 12);
+    txt(agotado ? 'COMPRADO' : `${it.p} PTS`, x + w - 6, y + 31, 6, agotado ? '#80c0ff' : puede ? '#80ff80' : '#a04040', 'right', w - 12);
+    G.botones.push({ x, y, w, h, fn: () => comprar(it) });
+  });
+  boton('SEGUIR  >', VW / 2 - 60, VH - 30, 120, 22, () => { G.estado = 'jugando'; }, true, 8);
+}
+
 function nuevoEstado() {
-  return { estado: 'titulo', zona: 0, fase: 'banner', faseT: 0, ola: 0, cola: [], spawnT: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0,
+  return { estado: 'titulo', modo: 'campania', gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 }, xpPartida: 0, zona: 0, fase: 'banner', faseT: 0, ola: 0, cola: [], spawnT: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0,
     racha: 0, tiempo: 0, banner: null, radio: null, toasts: [], shake: 0, rojo: 0, hitmark: 0, hitBaja: false, retroceso: 0,
     jefe: null, muerteT: 0, botones: [], cp: null, ganoT: 0 };
 }
 G = nuevoEstado();
 function nuevoJugador(x, y) {
-  return { x, y, r: 6, hp: 100, ang: 0, arma: 1, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }], gran: 3,
+  const mv = maxVida();
+  return { x, y, r: 6, hp: mv, maxhp: mv, ang: 0, arma: 1, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }], gran: 3,
     cd: 0, recarga: 0, ultGolpe: 99, oculto: false, paso: 0, corriendo: false };
 }
 
@@ -383,12 +453,23 @@ function iniciarJuego() {
   Snd.init();
   construirMapa(); pintarMundo(); construirGrilla(); campoT = 0;
   G = nuevoEstado();
-  G.cp = { zona: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }], gran: 3, racha: 0, S: { dron: false, aereo: false, torreta: false } };
+  G.cp = { zona: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }],
+    gran: 3 + (nivelActual() >= 5 ? 1 : 0), racha: 0, S: { dron: false, aereo: false, torreta: false }, gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 } };
   cargarCheckpoint();
+}
+// Modo supervivencia: oleadas infinitas en el faro
+function iniciarSupervivencia() {
+  iniciarJuego();
+  G.modo = 'supervivencia';
+  G.cp.zona = 3; G.cp.gran = 4 + (nivelActual() >= 5 ? 1 : 0); G.cp.mun[1].res = 150; G.cp.mun[2].res = 24;
+  cargarCheckpoint();
+  P.x = 3060; P.y = 450;
+  banner('MODO SUPERVIVENCIA', '¿Cuántas oleadas aguantás?', 3);
+  radio('No viene ningún helicóptero. Aguantá todo lo que puedas.');
 }
 function guardarCheckpoint() {
   G.cp = { zona: G.zona, pts: G.pts, bajas: G.bajas, disparos: G.disparos, aciertos: G.aciertos, mun: P.mun.map(m => ({ ...m })),
-    gran: Math.max(P.gran, 2), racha: G.racha, S: { ...S } };
+    gran: Math.max(P.gran, 2), racha: G.racha, S: { ...S }, gastado: G.gastado, compras: { ...G.compras }, mej: { ...G.mej } };
   guardarPartida();
 }
 function cargarCheckpoint() {
@@ -398,6 +479,8 @@ function cargarCheckpoint() {
   portones.forEach((p, i) => p.abierto = i < cp.zona);
   estaciones.forEach(e => e.cd = 0);
   const z = ZONAS[cp.zona];
+  G.gastado = cp.gastado || 0; G.compras = { ...(cp.compras || {}) }; G.mej = { chaleco: 0, fusil: 0, escopeta: 0, ...(cp.mej || {}) };
+  if (G.modo === 'supervivencia') portones.forEach(p => p.abierto = true);
   P = nuevoJugador(z.entrada[0], z.entrada[1]);
   P.mun = cp.mun.map(m => ({ ...m })); P.gran = cp.gran;
   Object.assign(G, { estado: 'jugando', zona: cp.zona, pts: cp.pts, bajas: cp.bajas, disparos: cp.disparos, aciertos: cp.aciertos,
@@ -412,19 +495,24 @@ function entrarZona(i) {
   banner(`ZONA ${i + 1}: ${ZONAS[i].nombre}`, i === 0 ? 'Limpiá las 4 zonas y llegá al faro' : 'Prepará el arma...');
   radio(ZONAS[i].radio);
 }
-function olaGlobal() { let n = 0; for (let i = 0; i < G.zona; i++) n += ZONAS[i].oleadas.length; return n + G.ola; }
+function olaGlobal() { if (G.modo === 'supervivencia') return G.ola + 2; let n = 0; for (let i = 0; i < G.zona; i++) n += ZONAS[i].oleadas.length; return n + G.ola; }
 function iniciarOla(i) {
   G.ola = i; G.fase = 'ola';
-  const n = ZONAS[G.zona].oleadas[i], gw = olaGlobal();
+  const sup = G.modo === 'supervivencia';
+  const n = sup ? 5 + i * 2 : ZONAS[G.zona].oleadas[i], gw = olaGlobal();
   G.cola = [];
   for (let k = 0; k < n; k++) {
     const r = Math.random(); let t = 'soldado';
-    if (gw >= 2 && r < 0.28) t = 'corredor';
-    else if (gw >= 4 && r < 0.28 + Math.min(0.25, 0.08 + gw * 0.02)) t = 'pesado';
+    if (gw >= 2 && r < 0.24) t = 'corredor';
+    else if (gw >= 4 && r < 0.24 + Math.min(0.22, 0.08 + gw * 0.02)) t = 'pesado';
+    else if (gw >= 1 && r > 0.87) t = 'perro';
+    else if (gw >= 3 && r > 0.76) t = 'francotirador';
     G.cola.push(t);
   }
+  if (gw >= 1 && Math.random() < 0.5) G.cola.push('perro', 'perro');   // los perros vienen en jauría
+  if (sup && (i + 1) % 5 === 0) G.cola.push('jefe');
   G.spawnT = 0.5;
-  banner(`OLEADA ${gw + 1}`, `${n} enemigos`, 2);
+  banner(`OLEADA ${sup ? i + 1 : gw + 1}`, `${G.cola.length} enemigos`, 2);
   Snd.play('alarma');
 }
 
@@ -487,9 +575,9 @@ function disparar() {
   m.c--; P.cd = w.cadencia; G.disparos += w.perdigones;
   const mx = P.x + Math.cos(P.ang) * 9, my = P.y + Math.sin(P.ang) * 9;
   const extra = (P.corriendo ? 1.6 : 1) * (1 + G.retroceso * 0.15);
-  for (let i = 0; i < w.perdigones; i++) {
+  for (let i = 0, np = w.perdigones + extraPerdigones(P.arma); i < np; i++) {
     const a = P.ang + rand(-w.disp, w.disp) * extra, v = w.vel * rand(0.92, 1.05);
-    balas.push({ x: mx, y: my, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: w.vida, dmg: w.dmg, duenio: 'j', src: 'arma' });
+    balas.push({ x: mx, y: my, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: w.vida, dmg: w.dmg * mulDanio(P.arma), duenio: 'j', src: 'arma' });
   }
   fogonazos.push({ x: mx, y: my, k: 0.06, r: 46 });
   const pa = P.ang + Math.PI / 2;
@@ -569,6 +657,7 @@ function golpearEnemigo(e, dmg, b, src) {
 }
 function matarEnemigo(e, src) {
   e.muerto = true; G.bajas++; G.pts += e.T.pts; pop(e.x, e.y - 8, '+' + e.T.pts);
+  G.xpPartida += e.T.pts; ganarXp(e.T.pts);
   if (src === 'arma' || src === 'granada') { sumarRacha(); G.hitBaja = true; G.hitmark = 0.25; }
   Snd.play('baja');
   for (let i = 0; i < 10; i++) particulas.push({ x: e.x, y: e.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.6, max: 0.6, c: i % 2 ? '#7a1010' : e.T.cuerpo, s: 2, roce: 5 });
@@ -597,6 +686,7 @@ function explotar(x, y, r, dmg, o = {}) {
 }
 function morir() {
   G.estado = 'muerto'; G.muerteT = 0; Snd.play('derrota');
+  if (G.modo === 'supervivencia' && (G.olasSup || 0) > recordSup) { recordSup = G.olasSup; try { localStorage.setItem('faro_record_sup', recordSup); } catch (e) {} }
   for (let i = 0; i < 16; i++) particulas.push({ x: P.x, y: P.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.8, max: 0.8, c: '#3f7a3a', s: 2, roce: 4 });
 }
 
@@ -647,6 +737,9 @@ function crearEnemigo(tipo, x, y) {
   const hp = T.hp * dif().hp * (T.jefe ? 1 : 1 + gw * 0.06);
   const e = { tipo, T, x, y, r: T.r, hp, maxhp: hp, ang: Math.atan2(P.y - y, P.x - x), estado: 'pelea', estT: 0, strafe: 0, disCd: rand(0.8, 1.6),
     vis: false, visT: 0, flash: 0, cubCd: 0, meleeCd: 0, atasco: 0, desvT: 0, dvx: 0, dvy: 0, paso: 0, granCd: 4, muerto: false };
+  if (T.sniper) e.disCd = rand(2, 3);
+  if (T.jefe) G.jefe = e;
+  if (T.perro && dist(x, y, P.x, P.y) < 500) Snd.play('ladrido');
   enemigos.push(e); return e;
 }
 function spawnear(tipo) {
@@ -696,7 +789,7 @@ function actualizarEnemigo(e, dt) {
     const c = e.vis ? null : dirCampo(e);
     if (c) { mx = c.x; my = c.y; } else { mx = dx / d; my = dy / d; }
     e.ang = quiere; e.meleeCd -= dt;
-    if (d < e.r + P.r + 3 && e.meleeCd <= 0) { herirJugador(T.melee, e.x, e.y); e.meleeCd = 0.8; Snd.play('cuchillo'); }
+    if (d < e.r + P.r + 3 && e.meleeCd <= 0) { herirJugador(T.melee, e.x, e.y); e.meleeCd = T.perro ? 0.6 : 0.8; Snd.play(T.perro ? 'ladrido' : 'cuchillo'); }
   } else {
     e.estT -= dt;
     if (e.estado === 'cubierto') {
@@ -786,7 +879,12 @@ function alPresionar(c) {
       if (c === 'KeyP' || c === 'Escape' || c === 'Enter') G.estado = 'jugando';
       break;
     case 'muerto':
-      if (G.muerteT > 1 && (c === 'Enter' || c === 'Space')) cargarCheckpoint();
+      if (G.muerteT > 1 && (c === 'Enter' || c === 'Space')) reintentar();
+      if (G.muerteT > 1 && c === 'Escape') irTitulo();
+      break;
+    case 'tienda':
+      if (c === 'Enter' || c === 'Escape' || c === 'Space') G.estado = 'jugando';
+      if (c.startsWith('Digit')) { const it = TIENDA[+c.slice(5) - 1]; if (it) comprar(it); }
       if (G.muerteT > 1 && c === 'Escape') irTitulo();
       break;
     case 'victoria':
@@ -795,6 +893,7 @@ function alPresionar(c) {
   }
 }
 function irTitulo() { G = nuevoEstado(); }
+function reintentar() { if (G.modo === 'supervivencia') iniciarSupervivencia(); else cargarCheckpoint(); }
 
 cv.addEventListener('mousemove', e => { const v = toVirtual(e.clientX, e.clientY); mouse.x = v.x; mouse.y = v.y; touch.activo = false; });
 cv.addEventListener('mousedown', e => {
@@ -844,7 +943,7 @@ function actualizar(dt) {
     cam.x = (Math.sin(NOW * 0.05) * 0.5 + 0.5) * (WW - VW); cam.y = 300 + Math.sin(NOW * 0.13) * 120;
     return;
   }
-  if (G.estado === 'pausa' || G.estado === 'ayuda') return;
+  if (G.estado === 'pausa' || G.estado === 'ayuda' || G.estado === 'tienda') return;
   if (G.estado === 'muerto') { G.muerteT += dt; actualizarEfectos(dt * 0.4); return; }
   if (G.estado === 'victoria') { G.ganoT += dt; actualizarHeli(dt); actualizarEfectos(dt); return; }
 
@@ -874,7 +973,7 @@ function actualizar(dt) {
   if (quiereDisparar && !P.oculto) disparar();
   // Regeneración estilo COD: si no te pegan por 3.5s, te curás
   P.ultGolpe += dt;
-  if (P.ultGolpe > 3.5 && P.hp < 100) P.hp = Math.min(100, P.hp + 30 * dt);
+  if (P.ultGolpe > 3.5 && P.hp < P.maxhp) P.hp = Math.min(P.maxhp, P.hp + 30 * dt);
 
   // --- Items ---
   for (const it of items) {
@@ -882,7 +981,7 @@ function actualizar(dt) {
     if (!P.oculto && dist(it.x, it.y, P.x, P.y) < 12) {
       it.k = -1;
       if (it.tipo === 'municion') { P.mun[1].res += 30; P.mun[2].res += 4; pop(P.x, P.y - 12, '+MUNICIÓN', '#a0ff80'); }
-      if (it.tipo === 'botiquin') { P.hp = Math.min(100, P.hp + 40); pop(P.x, P.y - 12, '+VIDA', '#ff9090'); }
+      if (it.tipo === 'botiquin') { P.hp = Math.min(P.maxhp, P.hp + 40); pop(P.x, P.y - 12, '+VIDA', '#ff9090'); }
       if (it.tipo === 'granada') { P.gran = Math.min(5, P.gran + 1); pop(P.x, P.y - 12, '+GRANADA', '#ffe060'); }
       Snd.play('item');
     }
@@ -999,12 +1098,18 @@ function actualizarMision(dt) {
   switch (G.fase) {
     case 'banner': if (G.faseT <= 0) iniciarOla(0); break;
     case 'ola': {
-      const maxVivos = 6 + G.zona * 2;
+      const sup = G.modo === 'supervivencia';
+      const maxVivos = sup ? 10 + Math.min(G.ola, 8) : 6 + G.zona * 2;
       G.spawnT -= dt;
       if (G.cola.length && G.spawnT <= 0 && enemigos.length < maxVivos) { if (spawnear(G.cola[0])) G.cola.shift(); G.spawnT = rand(0.5, 1.1); }
       if (!G.cola.length && !enemigos.length) {
-        const bonus = 250 * (olaGlobal() + 1); G.pts += bonus; Snd.play('racha');
-        if (G.ola < Z.oleadas.length - 1) { G.fase = 'descanso'; G.faseT = 6; banner('OLEADA SUPERADA', `+${bonus} puntos · próxima en 6s`, 2.5); }
+        const bonus = 250 * (olaGlobal() + 1); G.pts += bonus; ganarXp(bonus / 5); Snd.play('racha');
+        if (sup) {
+          G.fase = 'descanso'; G.faseT = 6; G.olasSup = G.ola + 1;
+          banner(`OLEADA ${G.ola + 1} SUPERADA`, `+${bonus} puntos · próxima en 6s`, 2.5);
+          if ((G.ola + 1) % 3 === 0) abrirTienda();
+        }
+        else if (G.ola < Z.oleadas.length - 1) { G.fase = 'descanso'; G.faseT = 6; banner('OLEADA SUPERADA', `+${bonus} puntos · próxima en 6s`, 2.5); }
         else if (G.zona === ZONAS.length - 1) {
           G.fase = 'defensa'; G.faseT = DEFENSA_SEG; G.spawnT = 2;
           banner('¡DEFENDÉ EL FARO!', `Aguantá ${DEFENSA_SEG} segundos`, 3);
@@ -1015,6 +1120,7 @@ function actualizarMision(dt) {
           G.fase = 'avanzar'; portones[G.zona].abierto = true;
           banner('¡ZONA DESPEJADA!', `+${bonus} puntos · avanzá hacia el este >>`, 3);
           radio('Buen trabajo. El portón está abierto, seguí hacia el este.');
+          abrirTienda();
         }
       }
       break;
@@ -1026,7 +1132,7 @@ function actualizarMision(dt) {
     case 'defensa':
       G.spawnT -= dt;
       if (G.spawnT <= 0 && enemigos.length < 12) {
-        const r = Math.random(); spawnear(r < 0.3 ? 'corredor' : r < 0.55 ? 'pesado' : 'soldado'); G.spawnT = rand(1.2, 1.8);
+        const r = Math.random(); spawnear(r < 0.25 ? 'corredor' : r < 0.45 ? 'pesado' : r < 0.58 ? 'perro' : r < 0.68 ? 'francotirador' : 'soldado'); G.spawnT = rand(1.2, 1.8);
       }
       if (G.faseT <= 0) {
         G.fase = 'extraccion'; heli = { x: 3800, y: 420, alt: 70, estado: 'llegando', k: 0, sx: 3800, sy: 420 };
@@ -1039,7 +1145,7 @@ function actualizarMision(dt) {
       if (G.spawnT <= 0 && enemigos.length < 8) { spawnear(Math.random() < 0.5 ? 'corredor' : 'soldado'); G.spawnT = rand(2.5, 3.5); }
       if (heli && heli.estado === 'aterrizado' && dist(P.x, P.y, PAD.x, PAD.y) < 26) {
         P.oculto = true; heli.estado = 'despegando'; heli.k = 0; G.fase = 'fin';
-        G.pts += 2000 + Math.round(P.hp) * 10; banner('¡EXTRACCIÓN!', '+2000 puntos', 3);
+        G.pts += 2000 + Math.round(P.hp) * 10; ganarXp(1000); G.xpPartida += 1000; banner('¡EXTRACCIÓN!', '+2000 puntos', 3);
       }
       break;
     case 'fin':
@@ -1067,6 +1173,17 @@ function ganar() {
 }
 
 // ---------- Dibujo ----------
+function dibujarPerro(g, e) {
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(e.x + 1, e.y + 2, 6, 3, e.ang, 0, 7); g.fill();
+  g.save(); g.translate(e.x, e.y); g.rotate(e.ang);
+  const p = Math.sin(e.paso * 0.9) * 2, c = e.flash > 0 ? '#fff' : e.T.cuerpo;
+  g.fillStyle = '#2a1a0c'; g.fillRect(-4 + p, -3.5, 2, 1.5); g.fillRect(2 - p, -3.5, 2, 1.5); g.fillRect(-4 - p, 2, 2, 1.5); g.fillRect(2 + p, 2, 2, 1.5);
+  g.fillStyle = c; g.fillRect(-5, -2.5, 10, 5);          // cuerpo
+  g.fillRect(4, -2, 4, 4);                               // cabeza
+  g.fillStyle = e.flash > 0 ? '#fff' : e.T.casco; g.fillRect(7, -1, 2, 2); g.fillRect(-8, -0.5 + p * 0.3, 3, 1); // hocico y cola
+  g.fillRect(4, -3, 1.5, 1.5); g.fillRect(4, 1.5, 1.5, 1.5); // orejas
+  g.restore();
+}
 function dibujarSoldado(g, x, y, ang, r, cuerpo, casco, largoArma, flash, paso) {
   g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(x + 1, y + 2, r, r * 0.8, 0, 0, 7); g.fill();
   g.save(); g.translate(x, y); g.rotate(ang);
@@ -1131,13 +1248,14 @@ function render() {
   }
   // Enemigos
   for (const e of enemigos) if (visible(e.x, e.y)) {
-    dibujarSoldado(lx, e.x, e.y, e.ang, e.r, e.T.cuerpo, e.T.casco, e.T.arma, e.flash > 0, e.paso);
+    if (e.T.perro) dibujarPerro(lx, e);
+    else dibujarSoldado(lx, e.x, e.y, e.ang, e.r, e.T.cuerpo, e.T.casco, e.T.arma, e.flash > 0, e.paso);
     if (e.T.pesado || e.tipo === 'pesado') { lx.fillStyle = '#6a6a72'; lx.fillRect(e.x - 3, e.y - 3, 2, 6); }
     if (e.hp < e.maxhp && !e.T.jefe) { lx.fillStyle = '#300'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12, 2); lx.fillStyle = '#e03030'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12 * e.hp / e.maxhp, 2); }
   }
   // Jugador
   if (!enMenu() && !P.oculto && G.estado !== 'muerto') {
-    dibujarSoldado(lx, P.x, P.y, P.ang, P.r, '#3f7a3a', '#2e5a2b', P.arma === 2 ? 10 : P.arma === 1 ? 9 : 5, false, P.paso);
+    dibujarSoldado(lx, P.x, P.y, P.ang, P.r, CAMOS[PERFIL.camo].c, CAMOS[PERFIL.camo].h, P.arma === 2 ? 10 : P.arma === 1 ? 9 : 5, false, P.paso);
     if (P.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(P.x - 8, P.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(P.x - 8, P.y - 13, 16 * (1 - P.recarga / ARMAS[P.arma].recarga), 2); }
   }
   // Drones (con sombra)
@@ -1213,9 +1331,10 @@ function render() {
   lx.globalAlpha = 1;
   // láseres de enemigos que están por disparar (¡esquivá!)
   for (const e of enemigos) {
-    if (!e.T.melee && e.vis && e.disCd < 0.45 && !P.oculto) {
-      const d = Math.min(dist(e.x, e.y, P.x, P.y), 170);
-      lx.strokeStyle = `rgba(255,30,30,${0.35 + 0.4 * (1 - e.disCd / 0.45)})`; lx.lineWidth = 1;
+    const aviso = e.T.sniper ? 1.3 : 0.45;   // el francotirador avisa con un láser largo
+    if (!e.T.melee && e.vis && e.disCd < aviso && !P.oculto) {
+      const d = Math.min(dist(e.x, e.y, P.x, P.y), e.T.sniper ? 400 : 170);
+      lx.strokeStyle = `rgba(255,30,30,${0.35 + 0.5 * (1 - e.disCd / aviso)})`; lx.lineWidth = e.T.sniper && e.disCd < 0.3 ? 2 : 1;
       lx.beginPath(); lx.moveTo(e.x + Math.cos(e.ang) * 8, e.y + Math.sin(e.ang) * 8); lx.lineTo(e.x + Math.cos(e.ang) * d, e.y + Math.sin(e.ang) * d); lx.stroke();
     }
     // ojitos rojos para verlos en la oscuridad
@@ -1257,6 +1376,7 @@ function render() {
   else {
     dibujarHUD(cx, cy);
     if (G.estado === 'pausa') dibujarPausa();
+    if (G.estado === 'tienda') dibujarTienda();
     if (G.estado === 'muerto') dibujarMuerte();
     if (G.estado === 'victoria') dibujarVictoria();
   }
@@ -1325,7 +1445,7 @@ function dibujarMira() {
 
 function dibujarHUD(cx, cy) {
   // Pantalla roja cuando te lastiman (estilo COD)
-  const dano = (1 - P.hp / 100) * 0.75 + G.rojo;
+  const dano = (1 - P.hp / P.maxhp) * 0.75 + G.rojo;
   if (dano > 0.02) {
     const gr = ctx.createRadialGradient(VW / 2, VH / 2, VH * 0.25, VW / 2, VH / 2, VW * 0.65);
     gr.addColorStop(0, 'rgba(160,0,0,0)'); gr.addColorStop(1, `rgba(160,0,0,${Math.min(0.85, dano)})`);
@@ -1344,16 +1464,20 @@ function dibujarHUD(cx, cy) {
   txt('VIDA', 8, 7, 6, '#cfd8c8');
   ctx.fillStyle = '#300'; ctx.fillRect(8, 15, 96, 7);
   const hc = P.hp > 60 ? '#40d040' : P.hp > 30 ? '#e0c030' : '#e03030';
-  ctx.fillStyle = hc; ctx.fillRect(8, 15, 96 * P.hp / 100, 7);
+  ctx.fillStyle = hc; ctx.fillRect(8, 15, 96 * P.hp / P.maxhp, 7);
   ctx.strokeStyle = '#000'; ctx.strokeRect(8.5, 15.5, 95, 6);
-  txt('PTS ' + String(G.pts).padStart(6, '0'), 8, 26, 6, '#ffe060');
+  txt('PTS ' + String(G.pts).padStart(6, '0'), 8, 25, 6, '#ffe060');
+  const nv = nivelActual();
+  txt('NV' + nv, 104, 25, 6, '#80c0ff', 'right');
+  ctx.fillStyle = '#223'; ctx.fillRect(8, 33, 96, 2);
+  ctx.fillStyle = '#80c0ff'; ctx.fillRect(8, 33, nv >= NIVEL_MAX ? 96 : 96 * (PERFIL.xp - xpTotal(nv)) / (xpTotal(nv + 1) - xpTotal(nv)), 2);
 
   // Zona / oleada
   const Z = ZONAS[G.zona];
   caja(VW / 2 - 92, 4, 184, 22);
   txt(`ZONA ${G.zona + 1}: ${Z.nombre}`, VW / 2, 7, 6, '#ffffff', 'center');
   let sub = '';
-  if (G.fase === 'ola') sub = `OLEADA ${G.ola + 1}/${Z.oleadas.length} · ENEMIGOS ${enemigos.length + G.cola.length}`;
+  if (G.fase === 'ola') sub = G.modo === 'supervivencia' ? `SUPERVIVENCIA · OLEADA ${G.ola + 1} · ENEMIGOS ${enemigos.length + G.cola.length}` : `OLEADA ${G.ola + 1}/${Z.oleadas.length} · ENEMIGOS ${enemigos.length + G.cola.length}`;
   else if (G.fase === 'descanso') sub = `PRÓXIMA OLEADA EN ${Math.ceil(G.faseT)}`;
   else if (G.fase === 'banner') sub = '¡PREPARATE!';
   else if (G.fase === 'avanzar') sub = Math.floor(NOW * 2) % 2 ? 'AVANZÁ HACIA EL ESTE >>' : 'AVANZÁ HACIA EL ESTE  >';
@@ -1490,10 +1614,19 @@ function dibujarTitulo() {
     boton(touch.activo ? 'NUEVA PARTIDA' : 'NUEVA  [ENTER]', VW / 2 - 150, 132, 145, 24, iniciarJuego, false, 8);
     boton(`CONTINUAR ZONA ${save.zona + 1}`, VW / 2 + 5, 132, 145, 24, continuarPartida, pul === 1, 8);
   } else boton(touch.activo ? 'JUGAR' : 'JUGAR  [ENTER]', VW / 2 - 70, 132, 140, 24, iniciarJuego, pul === 1, 8);
-  boton('CÓMO JUGAR', VW / 2 - 70, 164, 140, 20, () => abrirAyuda('titulo'), false, 7);
-  txt(touch.activo ? 'Jugá con el celular acostado' : 'Click en la pantalla y usá teclado + mouse', VW / 2, 192, 5, '#a8b8a0', 'center');
+  boton('SUPERVIVENCIA', VW / 2 - 150, 162, 97, 20, iniciarSupervivencia, false, 6);
+  boton('CÓMO JUGAR', VW / 2 - 48, 162, 96, 20, () => abrirAyuda('titulo'), false, 6);
+  const camo = CAMOS[PERFIL.camo];
+  boton('CAMO: ' + camo.n, VW / 2 + 53, 162, 97, 20, cambiarCamo, false, 6);
+  ctx.fillStyle = camo.c; ctx.fillRect(VW / 2 + 140, 168, 6, 8);
+  // Nivel y experiencia
+  const nv = nivelActual(), sig = nv >= NIVEL_MAX ? null : xpTotal(nv + 1);
+  txt(`NIVEL ${nv}` + (sig ? `  ·  XP ${PERFIL.xp}/${sig}` : '  ·  NIVEL MÁXIMO'), VW / 2, 190, 6, '#80c0ff', 'center');
+  ctx.fillStyle = '#223'; ctx.fillRect(VW / 2 - 100, 200, 200, 3);
+  ctx.fillStyle = '#80c0ff'; ctx.fillRect(VW / 2 - 100, 200, sig ? 200 * (PERFIL.xp - xpTotal(nv)) / (sig - xpTotal(nv)) : 200, 3);
+  if (sig) txt(`Próximo premio: ${PREMIOS[nv + 1]}`, VW / 2, 208, 5, '#a8b8a0', 'center');
   txt('Idea y código original: BRUNO (12 años)', VW / 2, VH - 30, 6, '#ffe060', 'center');
-  txt(`RÉCORD: ${record}` + (save ? '   ·   PROGRESO GUARDADO' : ''), VW / 2, VH - 16, 5, '#888', 'center');
+  txt(`RÉCORD: ${record}   ·   SUPERVIVENCIA: ${recordSup} OLEADAS` + (save ? '   ·   PROGRESO GUARDADO' : ''), VW / 2, VH - 16, 5, '#888', 'center');
 }
 
 const enMenu = () => G.estado === 'titulo' || (G.estado === 'ayuda' && G.ayudaDesde === 'titulo');
@@ -1531,6 +1664,14 @@ const AYUDA = [
     'La pistola nunca se queda sin balas.',
     'Los enemigos sueltan munición, botiquines y granadas.',
     'Tu avance se guarda solo al entrar a cada zona.' ] },
+  { t: 'NIVELES, TIENDA Y MÁS', l: [
+    'Cada baja te da EXPERIENCIA (XP). Con XP subís de NIVEL.',
+    'Cada nivel desbloquea algo: más vida, armas mejores,',
+    'granadas extra y camuflajes (elegilos en el menú: CAMO).',
+    'Al despejar una zona se abre la TIENDA: gastá tus puntos.',
+    'PERROS: rápidos y vienen en grupo. ¡Disparales primero!',
+    'FRANCOTIRADOR: láser rojo largo. Cuando se ve, ¡escondete!',
+    'SUPERVIVENCIA: oleadas infinitas. Tienda cada 3 oleadas.' ] },
 ];
 function abrirAyuda(desde) { G.ayudaDesde = desde; G.ayudaPag = touch.activo && desde === 'titulo' ? 0 : 0; G.estado = 'ayuda'; }
 function cerrarAyuda() { G.estado = G.ayudaDesde || 'titulo'; }
@@ -1573,11 +1714,13 @@ function dibujarMuerte() {
   const a = Math.min(1, G.muerteT);
   ctx.fillStyle = `rgba(40,0,0,${0.75 * a})`; ctx.fillRect(0, 0, VW, VH);
   ctx.globalAlpha = a;
-  txt('MISIÓN FALLIDA', VW / 2, 60, 18, '#ff3030', 'center');
-  txt('Se te acabó la vida antes de la extracción.', VW / 2, 88, 6, '#ffffff', 'center');
-  txt(`Puntos: ${G.pts}   Bajas: ${G.bajas}   Zona: ${G.zona + 1}/4`, VW / 2, 104, 6, '#ffe060', 'center');
+  const sup = G.modo === 'supervivencia';
+  txt(sup ? 'FIN DE LA SUPERVIVENCIA' : 'MISIÓN FALLIDA', VW / 2, 50, 16, '#ff3030', 'center');
+  txt(sup ? `Aguantaste ${G.olasSup || 0} oleadas · Récord: ${recordSup}` : 'Se te acabó la vida antes de la extracción.', VW / 2, 80, 6, '#ffffff', 'center');
+  txt(`Puntos: ${G.pts}   Bajas: ${G.bajas}` + (sup ? '' : `   Zona: ${G.zona + 1}/4`), VW / 2, 96, 6, '#ffe060', 'center');
+  txt(`XP ganada: +${G.xpPartida}   ·   Nivel ${nivelActual()}`, VW / 2, 110, 6, '#80c0ff', 'center');
   if (G.muerteT > 1) {
-    boton(`REINTENTAR ZONA ${G.zona + 1}  [ENTER]`, VW / 2 - 100, 130, 200, 22, cargarCheckpoint, Math.floor(NOW * 2) % 2 === 1);
+    boton(sup ? 'OTRA VEZ  [ENTER]' : `REINTENTAR ZONA ${G.zona + 1}  [ENTER]`, VW / 2 - 100, 130, 200, 22, reintentar, Math.floor(NOW * 2) % 2 === 1);
     boton('MENÚ PRINCIPAL  [ESC]', VW / 2 - 100, 160, 200, 18, irTitulo, false, 6);
   }
   ctx.globalAlpha = 1;
