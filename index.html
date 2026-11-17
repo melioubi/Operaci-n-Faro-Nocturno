@@ -1657,7 +1657,7 @@ function dibujarHUD(cx, cy) {
   else if (m.c <= w.cargador * 0.25 && m.res > 0) txt(tc ? 'Pocas balas: tocá RECAR' : 'Pocas balas: apretá R para recargar', VW / 2, VH - 92, 5, '#ffb040', 'center');
   // Ayuda de los primeros segundos de cada partida
   if (G.tiempo < 14) {
-    const msg = tc ? 'ARMA = cambiar de arma · RECAR = recargar · GRAN = granada' : 'R = RECARGAR   ·   1 2 3 o Q = CAMBIAR ARMA   ·   G = GRANADA';
+    const msg = tc ? 'Pulgar IZQUIERDO = caminar   ·   Pulgar DERECHO = apuntar y disparar' : 'R = RECARGAR   ·   1 2 3 o Q = CAMBIAR ARMA   ·   G = GRANADA';
     caja(VW / 2 - 150, 44, 300, 13, 0.6); txt(msg, VW / 2, 47, 5, '#ffe060', 'center', 292);
   }
 
@@ -1717,11 +1717,20 @@ function dibujarHUD(cx, cy) {
 }
 
 function dibujarTouch() {
-  for (const s of [touch.mov, touch.apu]) if (s) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(s.ox, s.oy, 22, 0, 7); ctx.stroke();
-    const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), k = d > 22 ? 22 / d : 1;
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(s.ox + dx * k, s.oy + dy * k, 9, 0, 7); ctx.fill();
-  }
+  // Dos joysticks siempre visibles: el izquierdo CAMINA, el derecho APUNTA Y DISPARA.
+  // Aparecen donde apoyás el dedo (en tu mitad de la pantalla) y el círculo sigue al dedo.
+  const stick = (s, base, color, l1, l2) => {
+    const ox = s ? s.ox : base.x, oy = s ? s.oy : base.y;
+    ctx.fillStyle = `rgba(${color},${s ? 0.18 : 0.1})`; ctx.beginPath(); ctx.arc(ox, oy, 26, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(${color},${s ? 0.8 : 0.45})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox, oy, 26, 0, 7); ctx.stroke();
+    let kx = 0, ky = 0;
+    if (s) { const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), k = d > 26 ? 26 / d : 1; kx = dx * k; ky = dy * k; }
+    ctx.fillStyle = `rgba(${color},${s ? 0.75 : 0.4})`; ctx.beginPath(); ctx.arc(ox + kx, oy + ky, 11, 0, 7); ctx.fill();
+    if (!s) { txt(l1, ox, oy - 40, 5, `rgb(${color})`, 'center', 90); txt(l2, ox, oy + 31, 4, '#c0c0c0', 'center', 90); }
+  };
+  stick(touch.mov, baseMov(), '120,200,255', 'CAMINAR', 'arrastrá el dedo');
+  stick(touch.apu, baseApu(), '255,110,90', 'APUNTAR Y DISPARAR', 'arrastrá: dispara solo');
+  if (touch.apu && YO !== undefined) { const m = P.mun[P.arma]; if (m.c > 0) txt('¡FUEGO!', touch.apu.ox, touch.apu.oy - 40, 5, '#ff8060', 'center'); }
   const bts = [['GRAN', VW - 22, VH - 72, () => accion('g')], ['RECAR', VW - 22, VH - 108, () => accion('r')], ['ARMA', VW - 56, VH - 72, () => accion('q')], ['CAJA', VW - 56, VH - 108, () => accion('e')]];
   const mm = P.mun[P.arma];
   for (const [l, x, y, fn] of bts) {
@@ -1789,13 +1798,13 @@ const AYUDA = [
     'Z: dron    X: ataque aéreo (donde apuntás)    C: torreta',
     'P o ESC: pausa      M: sonido' ] },
   { t: 'CONTROLES EN CELULAR', l: [
-    'Poné el celular acostado (horizontal).',
-    'Dedo en la mitad IZQUIERDA: joystick para moverte.',
-    'Dedo en la mitad DERECHA: apuntás y disparás.',
-    'Botones: G granada, R recargar, Q arma, E caja.',
-    'Tocá DRON / AÉREO / TORRE (abajo a la izquierda)',
-    'cuando estén encendidos para usarlos.',
-    'II arriba: pausa.' ] },
+    'Celular acostado. Usá los DOS PULGARES a la vez:',
+    'IZQUIERDA (azul): apoyá el dedo y arrastralo = CAMINAR.',
+    'DERECHA (rojo): arrastrá hacia el enemigo = APUNTA Y',
+    '   DISPARA SOLO. Soltá el dedo para dejar de disparar.',
+    'La mira te ayuda: si un enemigo está cerca, se le pega.',
+    'Botones: RECAR recargar · ARMA cambiar · GRAN granada.',
+    'Rachas: tocá DRON / AÉREO / TORRE. II arriba: pausa.' ] },
   { t: 'CONSEJOS', l: [
     'Si no te pegan por 3 segundos, la vida se recupera sola.',
     'Cubrite detrás de cajas, rocas, árboles y bolsas.',
@@ -1948,17 +1957,34 @@ function entradaLocal() {
   let ix = 0, iy = 0;
   if (teclas.KeyW || teclas.ArrowUp) iy--; if (teclas.KeyS || teclas.ArrowDown) iy++;
   if (teclas.KeyA || teclas.ArrowLeft) ix--; if (teclas.KeyD || teclas.ArrowRight) ix++;
-  if (touch.mov) { const dx = touch.mov.x - touch.mov.ox, dy = touch.mov.y - touch.mov.oy; ix += dx / 22; iy += dy / 22; }
+  if (touch.mov) { const dx = touch.mov.x - touch.mov.ox, dy = touch.mov.y - touch.mov.oy; ix += dx / 24; iy += dy / 24; }
   const L = Math.hypot(ix, iy); if (L > 1) { ix /= L; iy /= L; }
   const correr = !!(teclas.ShiftLeft || teclas.ShiftRight) || !!(touch.mov && L > 1.6);
   let ang = P.ang, fuego = mouse.abajo, ax = null, ay = null, apTouch = false;
   if (touch.activo) {
     apTouch = true; fuego = false;
-    if (touch.apu) { const dx = touch.apu.x - touch.apu.ox, dy = touch.apu.y - touch.apu.oy; if (Math.hypot(dx, dy) > 4) ang = Math.atan2(dy, dx); fuego = Math.hypot(dx, dy) > 10; }
+    // Joystick derecho: hacia donde lo empujás, apuntás Y disparás al mismo tiempo.
+    if (touch.apu) {
+      const dx = touch.apu.x - touch.apu.ox, dy = touch.apu.y - touch.apu.oy, d = Math.hypot(dx, dy);
+      if (d > 3) { ang = asistirMira(Math.atan2(dy, dx)); fuego = true; }
+    }
     else if (L > 0.2) ang = Math.atan2(iy, ix);
   } else { ax = cam.x + mouse.x; ay = cam.y + mouse.y; ang = Math.atan2(ay - P.y, ax - P.x); }
   return { ix, iy, correr, ang, fuego, ax, ay, apTouch };
 }
+// Ayuda de puntería para el celular: si hay un enemigo cerca de donde apuntás, la mira se le pega
+function asistirMira(ang) {
+  const blancos = G.modo === 'equipos' ? jugadores.filter(o => o.equipo !== P.equipo && !o.muerto) : enemigos;
+  let mejor = ang, md = 0.4;
+  for (const e of blancos) {
+    const d = dist(P.x, P.y, e.x, e.y); if (d > 280 || e.muerto) continue;
+    const a = Math.atan2(e.y - P.y, e.x - P.x), dif = Math.abs(angDif(ang, a));
+    if (dif < md && hayVision(P.x, P.y, e.x, e.y)) { md = dif; mejor = a; }
+  }
+  return mejor;
+}
+// Dónde se dibujan los joysticks cuando no los estás tocando
+const baseMov = () => ({ x: 62, y: VH - 92 }), baseApu = () => ({ x: VW - 118, y: VH - 92 });
 function moverJugador(j, inp, dt) {
   if (!inp) inp = { ix: 0, iy: 0, ang: j.ang };
   j.inv = Math.max(0, (j.inv || 0) - dt);
