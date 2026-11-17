@@ -46,6 +46,7 @@ Tu misión: limpiar las 4 zonas, sobrevivir a las oleadas y defender el faro has
 - Pantalla "Cómo jugar", se adapta a celular (horizontal) y compu, y el avance se guarda solo en el navegador (botón CONTINUAR).
 - Experiencia y niveles (1 a 10) que desbloquean vida, mejoras de armas, granadas y camuflajes.
 - Tienda entre zonas para gastar puntos, perros, francotiradores con láser largo y modo SUPERVIVENCIA con oleadas infinitas.
+- Multijugador online con amigos (botón CON AMIGOS): se crea una sala con link para invitar. Modos COOPERATIVO (todos contra la compu) y EQUIPOS (verde vs rojo), con bots que maneja la compu. Usa conexión directa entre navegadores (WebRTC con PeerJS).
 - Checkpoint al entrar a cada zona, 3 dificultades y música y sonidos chiptune generados por código.
 
 ## 🧠 Notas para Bruno (cosas que aprendimos de tu código)
