@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Operación Faro Nocturno</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="iconos/icono-32.png">
+<link rel="apple-touch-icon" href="iconos/icono-180.png">
+<meta name="theme-color" content="#05050a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Faro Nocturno">
 <meta name="description" content="Shooter retro 8-bits vista desde arriba. Propiedad intelectual: Bruco.">
 <style>
   html,body{margin:0;height:100%;background:#05050a;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -1607,16 +1615,37 @@ function dibujarHUD(cx, cy) {
   }
 
   // Arma y munición
-  const w = ARMAS[P.arma], m = P.mun[P.arma];
-  caja(VW - 128, VH - 38, 124, 34);
-  txt(w.nombre, VW - 8, VH - 34, 7, '#ffffff', 'right');
-  const resTxt = m.res === Infinity ? 'INF' : m.res;
-  txt(`${m.c}`, VW - 46, VH - 22, 10, m.c === 0 ? '#ff5050' : m.c <= w.cargador * 0.25 ? '#ffb040' : '#ffffff', 'right');
-  txt(`/${resTxt}`, VW - 8, VH - 19, 6, '#a0a0a0', 'right');
-  txt(`G x${P.gran}`, VW - 124, VH - 19, 6, '#c0e080');
-  for (let i = 0; i < 3; i++) { ctx.fillStyle = i === P.arma ? '#ffe060' : '#555'; ctx.fillRect(VW - 124 + i * 9, VH - 33, 7, 3); }
-  if (P.recarga > 0) txt('RECARGANDO...', VW - 66, VH - 48, 5, '#ffe060', 'center');
-  else if (m.c === 0 && m.res > 0) txt('[R] RECARGAR', VW - 66, VH - 48, 5, '#ff9090', 'center');
+  const w = ARMAS[P.arma], m = P.mun[P.arma], tc = touch.activo;
+  const bx0 = VW - 152, by0 = VH - 52;
+  caja(bx0, by0, 148, 48);
+  // Las 3 armas siempre a la vista: tecla + nombre + balas. Se pueden tocar/clickear para cambiar.
+  const cortos = ['PISTOLA', 'FUSIL', 'ESCOPETA'];
+  for (let i = 0; i < 3; i++) {
+    const x = bx0 + 3 + i * 48, y = by0 + 3, act = i === P.arma, mi = P.mun[i];
+    const vacia = mi.c === 0 && mi.res === 0;
+    ctx.fillStyle = act ? 'rgba(176,40,40,0.9)' : 'rgba(40,40,52,0.9)'; ctx.fillRect(x, y, 45, 16);
+    ctx.strokeStyle = act ? '#ffe060' : '#555'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, 44, 15);
+    txt(tc ? cortos[i] : `${i + 1} ${cortos[i]}`, x + 22.5, y + 2, 5, vacia ? '#ff6060' : '#ffffff', 'center', 41);
+    txt(mi.res === Infinity ? '∞' : `${mi.c}/${mi.res}`, x + 22.5, y + 9, 4, vacia ? '#ff6060' : '#b0b0b0', 'center', 41);
+    G.botones.push({ x, y, w: 45, h: 16, fn: () => accion(String(i + 1)) });
+  }
+  const resTxt = m.res === Infinity ? 'INFINITAS' : m.res;
+  txt(`${m.c}`, bx0 + 8, by0 + 24, 12, m.c === 0 ? '#ff5050' : m.c <= w.cargador * 0.25 ? '#ffb040' : '#ffffff', 'left');
+  txt(`/ ${resTxt}`, bx0 + 8 + String(m.c).length * 12 + 3, by0 + 30, 5, '#a0a0a0', 'left');
+  txt(`GRANADAS x${P.gran}`, bx0 + 144, by0 + 24, 5, '#c0e080', 'right');
+  txt(tc ? 'ARMA: cambiar' : 'Q/1/2/3: arma', bx0 + 144, by0 + 32, 4, '#888', 'right');
+  txt(tc ? 'RECAR: recargar' : 'R: recargar', bx0 + 144, by0 + 39, 4, '#888', 'right');
+  // Avisos grandes de munición
+  const parp = Math.floor(NOW * 3) % 2;
+  if (P.recarga > 0) txt('RECARGANDO...', VW / 2, VH - 92, 7, '#ffe060', 'center');
+  else if (m.c === 0 && m.res > 0) { if (parp) txt(tc ? '¡SIN BALAS! TOCÁ "RECAR" PARA RECARGAR' : '¡SIN BALAS! APRETÁ  R  PARA RECARGAR', VW / 2, VH - 92, 7, '#ff6060', 'center'); }
+  else if (m.c === 0 && m.res === 0) { if (parp) txt(tc ? '¡SIN MUNICIÓN! TOCÁ "ARMA" PARA CAMBIAR' : '¡SIN MUNICIÓN! CAMBIÁ DE ARMA CON  1  2  3  O  Q', VW / 2, VH - 92, 7, '#ff6060', 'center'); }
+  else if (m.c <= w.cargador * 0.25 && m.res > 0) txt(tc ? 'Pocas balas: tocá RECAR' : 'Pocas balas: apretá R para recargar', VW / 2, VH - 92, 5, '#ffb040', 'center');
+  // Ayuda de los primeros segundos de cada partida
+  if (G.tiempo < 14) {
+    const msg = tc ? 'ARMA = cambiar de arma · RECAR = recargar · GRAN = granada' : 'R = RECARGAR   ·   1 2 3 o Q = CAMBIAR ARMA   ·   G = GRANADA';
+    caja(VW / 2 - 150, 44, 300, 13, 0.6); txt(msg, VW / 2, 47, 5, '#ffe060', 'center', 292);
+  }
 
   // Rachas de bajas (la idea de Bruno)
   caja(4, VH - 46, 112, 42);
@@ -1679,10 +1708,12 @@ function dibujarTouch() {
     const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), k = d > 22 ? 22 / d : 1;
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(s.ox + dx * k, s.oy + dy * k, 9, 0, 7); ctx.fill();
   }
-  const bts = [['G', VW - 22, VH - 60, () => accion('g')], ['R', VW - 22, VH - 96, () => accion('r')], ['Q', VW - 56, VH - 60, () => accion('q')], ['E', VW - 56, VH - 96, () => accion('e')]];
+  const bts = [['GRAN', VW - 22, VH - 72, () => accion('g')], ['RECAR', VW - 22, VH - 108, () => accion('r')], ['ARMA', VW - 56, VH - 72, () => accion('q')], ['CAJA', VW - 56, VH - 108, () => accion('e')]];
+  const mm = P.mun[P.arma];
   for (const [l, x, y, fn] of bts) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1; ctx.stroke(); txt(l, x, y - 4, 8, '#fff', 'center');
+    const alerta = (l === 'RECAR' && mm.c <= ARMAS[P.arma].cargador * 0.25 && mm.res > 0) || (l === 'ARMA' && mm.c === 0 && mm.res === 0);
+    ctx.fillStyle = alerta && Math.floor(NOW * 4) % 2 ? 'rgba(200,40,40,0.8)' : 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1; ctx.stroke(); txt(l, x, y - 2.5, 5, '#fff', 'center', 27);
     G.botones.push({ x: x - 17, y: y - 17, w: 34, h: 34, fn });
   }
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(VW - 156, 4, 24, 22); txt('II', VW - 144, 11, 7, '#fff', 'center');
@@ -1719,7 +1750,8 @@ function dibujarTitulo() {
   ctx.fillStyle = '#223'; ctx.fillRect(VW / 2 - 100, 200, 200, 3);
   ctx.fillStyle = '#80c0ff'; ctx.fillRect(VW / 2 - 100, 200, sig ? 200 * (PERFIL.xp - xpTotal(nv)) / (sig - xpTotal(nv)) : 200, 3);
   if (sig) txt(`Próximo premio: ${PREMIOS[nv + 1]}`, VW / 2, 208, 5, '#a8b8a0', 'center');
-  txt('Propiedad intelectual: BRUCO', VW / 2, VH - 30, 6, '#ffe060', 'center');
+  creditoBruco(VH - 30);
+  if (!esApp()) boton('INSTALAR APP', VW - 84, 6, 78, 16, instalarApp, false, 5);
   txt(`RÉCORD: ${record}   ·   SUPERVIVENCIA: ${recordSup} OLEADAS` + (save ? '   ·   PROGRESO GUARDADO' : ''), VW / 2, VH - 16, 5, '#888', 'center');
 }
 
@@ -1842,7 +1874,7 @@ function dibujarVictoria() {
   txt('RANGO: ' + rango, VW / 2, 150, 10, '#80ff80', 'center');
   if (G.nuevoRecord && Math.floor(NOW * 3) % 2) txt('¡NUEVO RÉCORD!', VW / 2, 168, 8, '#ff8080', 'center');
   if (G.ganoT > 2) boton('VOLVER AL MENÚ', VW / 2 - 70, 190, 140, 20, irTitulo);
-  txt('Propiedad intelectual: BRUNO', VW / 2, VH - 18, 6, '#ffe060', 'center');
+  creditoBruco(VH - 18);
   ctx.globalAlpha = 1;
 }
 
@@ -2293,6 +2325,7 @@ function aplicarFoto(d) {
   for (const [n, v] of d.ev || []) if (typeof n === 'string') _play(n, v);
 }
 function actualizarCliente(dt) {
+  if (G.estado === 'jugando') G.tiempo += dt;
   G.rojo = Math.max(0, G.rojo - dt * 0.8); G.hitmark -= dt; G.retroceso = Math.max(0, G.retroceso - dt * 8);
   if (G.estado === 'muerto') G.muerteT += dt;
   if (G.estado === 'finEq') G.ganoT += dt;
@@ -2408,6 +2441,36 @@ function dibujarFinMP() {
     boton('SALIR', VW / 2 + 5, 180, 120, 22, salirRed, false, 7);
   }
   ctx.globalAlpha = 1;
+}
+
+// ---------- App instalable (PWA) ----------
+let pedidoInstalar = null;
+const esApp = () => { try { return matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone; } catch (e) { return false; } };
+const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+try {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !location.hostname.endsWith('claude.ai') && !location.hostname.endsWith('claudeusercontent.com'))
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+} catch (e) {}
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedidoInstalar = e; });
+addEventListener('appinstalled', () => { pedidoInstalar = null; G.toasts.push({ txt: '¡Juego instalado! Buscá el ícono del faro', color: '#a0ff80', k: 0 }); });
+function instalarApp() {
+  if (pedidoInstalar) { pedidoInstalar.prompt(); pedidoInstalar.userChoice.finally(() => { pedidoInstalar = null; }); return; }
+  G.toasts.push({ txt: esIOS ? 'iPhone: tocá Compartir y "Agregar a inicio"' : 'Menú del navegador (⋮) → "Instalar app" o "Agregar a inicio"', color: '#ffe060', k: 0 });
+}
+// Firma del autor: carita con lentes de sol (pixel art)
+function dibujarBruco(x, y, s = 1) {
+  const p = (px, py, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x + px * s, y + py * s, w * s, h * s); };
+  ctx.fillStyle = '#ffcc33'; ctx.beginPath(); ctx.arc(x + 5 * s, y + 5 * s, 5 * s, 0, 7); ctx.fill();
+  p(1, 3, 8, 1, '#111'); p(1, 3, 3, 3, '#111'); p(6, 3, 3, 3, '#111');          // lentes de sol
+  p(2, 4, 1, 1, '#556'); p(7, 4, 1, 1, '#556');                                  // brillito
+  p(3, 7, 4, 1, '#7a3b10'); p(2, 6, 1, 1, '#7a3b10'); p(7, 6, 1, 1, '#7a3b10');  // sonrisa
+}
+function creditoBruco(y, size = 6) {
+  const t = 'Propiedad intelectual: BRUCO';
+  ctx.font = `${size}px "Press Start 2P", monospace`;
+  const w = Math.min(ctx.measureText(t).width, VW - 40), x0 = VW / 2 - (w + 14) / 2;
+  dibujarBruco(x0, y - 2, 1);
+  txt(t, x0 + 14, y, size, '#ffe060', 'left', VW - 40);
 }
 
 // ---------- Arranque ----------

@@ -5,6 +5,9 @@ Shooter retro 8-bits con vista desde arriba, estilo supervivencia de Call of Dut
 
 ## 🎮 Jugar
 
+**Link del juego:** https://melioubi.github.io/Operaci-n-Faro-Nocturno/  
+Se puede instalar como app (botón INSTALAR APP en el menú, o "Agregar a inicio" en iPhone).
+
 Abrí el link de GitHub Pages del repo (o abrí `index.html` en el navegador). No hace falta instalar nada.
 Funciona en la compu (teclado + mouse) y también en tablet/celular (joysticks táctiles).
 
