@@ -15,7 +15,8 @@
 <meta name="description" content="Shooter retro 8-bits vista desde arriba. Propiedad intelectual: Bruco.">
 <style>
   html,body{margin:0;height:100%;background:#05050a;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
-  canvas{display:block;width:100vw;height:100vh;cursor:none}
+  /* fixed + inset:0 = el tamaño VISIBLE (en celulares 100vh queda tapado por la barra del navegador) */
+  canvas{display:block;position:fixed;inset:0;width:100%;height:100%;cursor:none;touch-action:none}
 </style>
 </head>
 <body>
@@ -94,7 +95,10 @@ const MUNDO = document.createElement('canvas'); MUNDO.width = WW; MUNDO.height =
 const wg = MUNDO.getContext('2d');
 let ESC = 1, OX = 0, OY = 0, DPR = 1;
 function resize() {
-  DPR = window.devicePixelRatio || 1;
+  // En celulares con pantallas de muy alta resolución dibujar a 3x hace que todo ande lento.
+  // El juego es pixel art: 1.5x alcanza y se ve igual de nítido.
+  const tactil = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  DPR = Math.min(window.devicePixelRatio || 1, tactil ? 1.5 : 2);
   cv.width = Math.floor(innerWidth * DPR); cv.height = Math.floor(innerHeight * DPR);
   // Pantallas anchas (celulares acostados, monitores) ven más mapa en vez de bandas negras
   const nuevoVW = Math.round(clamp(VH * innerWidth / innerHeight, 420, 620));
@@ -959,7 +963,8 @@ cv.addEventListener('touchstart', e => {
   e.preventDefault(); Snd.init(); touch.activo = true;
   for (const t of e.changedTouches) {
     const v = toVirtual(t.clientX, t.clientY);
-    if (tocarBoton(v.x, v.y)) continue;
+    if (G.estado === 'ayuda') touch.desliz = { x: v.x, y: v.y };
+    if (tocarBoton(v.x, v.y)) { touch.desliz = null; continue; }
     if (G.estado !== 'jugando') continue;
     if (v.x < VW * 0.45 && !touch.mov) touch.mov = { id: t.identifier, ox: v.x, oy: v.y, x: v.x, y: v.y };
     else if (!touch.apu) touch.apu = { id: t.identifier, ox: v.x, oy: v.y, x: v.x, y: v.y };
@@ -972,7 +977,16 @@ cv.addEventListener('touchmove', e => {
     for (const s of [touch.mov, touch.apu]) if (s && s.id === t.identifier) { s.x = v.x; s.y = v.y; }
   }
 }, { passive: false });
-const finTouch = e => { for (const t of e.changedTouches) { if (touch.mov && touch.mov.id === t.identifier) touch.mov = null; if (touch.apu && touch.apu.id === t.identifier) touch.apu = null; } };
+const finTouch = e => {
+  // Deslizar el dedo en las instrucciones cambia de página
+  if (touch.desliz && G.estado === 'ayuda' && e.changedTouches[0]) {
+    const v = toVirtual(e.changedTouches[0].clientX, e.changedTouches[0].clientY), dx = v.x - touch.desliz.x;
+    if (Math.abs(dx) > 35 && Math.abs(dx) > Math.abs(v.y - touch.desliz.y)) {
+      G.ayudaPag = clamp(G.ayudaPag + (dx < 0 ? 1 : -1), 0, AYUDA.length - 1); Snd.play('click');
+    }
+  }
+  touch.desliz = null;
+  for (const t of e.changedTouches) { if (touch.mov && touch.mov.id === t.identifier) touch.mov = null; if (touch.apu && touch.apu.id === t.identifier) touch.apu = null; } };
 cv.addEventListener('touchend', finTouch); cv.addEventListener('touchcancel', finTouch);
 
 function tocarBoton(x, y) {
@@ -1814,13 +1828,27 @@ function dibujarAyuda() {
   const p = AYUDA[G.ayudaPag];
   txt('CÓMO JUGAR', VW / 2, 12, 8, '#888', 'center');
   txt(p.t, VW / 2, 28, 12, '#ffe060', 'center');
-  caja(16, 50, VW - 32, 150, 0.5);
-  p.l.forEach((l, i) => txt(l, 26, 60 + i * 20, 6, '#e0e8d8', 'left', VW - 52));
-  txt(`${G.ayudaPag + 1} / ${AYUDA.length}`, VW / 2, 212, 6, '#888', 'center');
-  const bw = 110;
-  if (G.ayudaPag > 0) boton('< ANTERIOR', VW / 2 - bw * 1.5 - 8, 230, bw, 22, () => G.ayudaPag--, false, 7);
-  boton('VOLVER', VW / 2 - bw / 2, 230, bw, 22, cerrarAyuda, false, 7);
-  if (G.ayudaPag < AYUDA.length - 1) boton('SIGUIENTE >', VW / 2 + bw / 2 + 8, 230, bw, 22, () => G.ayudaPag++, true, 7);
+  caja(34, 50, VW - 68, 150, 0.5);
+  p.l.forEach((l, i) => txt(l, 42, 60 + i * 20, 6, '#e0e8d8', 'left', VW - 84));
+  // puntitos de página
+  for (let i = 0; i < AYUDA.length; i++) { ctx.fillStyle = i === G.ayudaPag ? '#ffe060' : '#444'; ctx.fillRect(VW / 2 - AYUDA.length * 5 + i * 10, 222, 6, 6); }
+  const bw = 110, ult = G.ayudaPag >= AYUDA.length - 1;
+  if (G.ayudaPag > 0) boton('< ANTERIOR', VW / 2 - bw * 1.5 - 8, 234, bw, 24, () => G.ayudaPag--, false, 7);
+  boton(ult ? 'LISTO' : 'SALIR', VW / 2 - bw / 2, 234, bw, 24, cerrarAyuda, ult, 7);
+  if (!ult) boton('SIGUIENTE >', VW / 2 + bw / 2 + 8, 234, bw, 24, () => G.ayudaPag++, true, 7);
+  // flechas grandes a los costados (fáciles de tocar en el celular)
+  const parp = Math.floor(NOW * 2) % 2;
+  const flecha = (x, dir, activa, fn) => {
+    ctx.fillStyle = activa ? (parp && dir > 0 ? 'rgba(176,40,40,0.9)' : 'rgba(40,40,52,0.9)') : 'rgba(30,30,30,0.4)';
+    ctx.fillRect(x, 95, 26, 60);
+    ctx.fillStyle = activa ? '#ffe060' : '#444'; ctx.beginPath();
+    if (dir > 0) { ctx.moveTo(x + 8, 110); ctx.lineTo(x + 19, 125); ctx.lineTo(x + 8, 140); } else { ctx.moveTo(x + 18, 110); ctx.lineTo(x + 7, 125); ctx.lineTo(x + 18, 140); }
+    ctx.closePath(); ctx.fill();
+    if (activa) G.botones.push({ x: x - 6, y: 60, w: 38, h: 130, fn: () => { Snd.play('click'); fn(); } });
+  };
+  flecha(2, -1, G.ayudaPag > 0, () => G.ayudaPag--);
+  flecha(VW - 28, 1, !ult, () => G.ayudaPag++);
+  if (G.ayudaPag === 0) txt(touch.activo ? 'Deslizá o tocá la flecha  >  para seguir' : 'Usá las flechas del teclado o clickeá  >', VW / 2, 206, 5, '#ffe060', 'center');
 }
 
 // ---------- Progreso guardado (en este navegador) ----------
