@@ -43,6 +43,7 @@ Tu misión: limpiar las 4 zonas, sobrevivir a las oleadas y defender el faro has
 - Las rachas de bajas de Bruno ahora funcionan: x3 dron que te sigue y dispara, x6 ataque aéreo de un avión, x10 torreta.
 - Cajas de munición, botiquines y granadas que sueltan los enemigos.
 - Puntos, hitmarkers, mensajes de radio, helicóptero que aterriza, final bueno y malo, rangos y récord.
+- Pantalla "Cómo jugar", se adapta a celular (horizontal) y compu, y el avance se guarda solo en el navegador (botón CONTINUAR).
 - Checkpoint al entrar a cada zona, 3 dificultades y música y sonidos chiptune generados por código.
 
 ## 🧠 Notas para Bruno (cosas que aprendimos de tu código)

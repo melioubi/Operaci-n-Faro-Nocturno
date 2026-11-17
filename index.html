@@ -21,7 +21,7 @@
    ===================================================================== */
 
 // ---------- Configuración general ----------
-const VW = 480, VH = 270;          // resolución "8 bits" interna
+let VW = 480; const VH = 270;      // resolución "8 bits" interna (el ancho se adapta a la pantalla)
 const WW = 3600, WH = 900;         // tamaño del mundo
 const OSCURIDAD = 0.82;            // qué tan de noche es (0 a 1)
 
@@ -86,6 +86,9 @@ let ESC = 1, OX = 0, OY = 0, DPR = 1;
 function resize() {
   DPR = window.devicePixelRatio || 1;
   cv.width = Math.floor(innerWidth * DPR); cv.height = Math.floor(innerHeight * DPR);
+  // Pantallas anchas (celulares acostados, monitores) ven más mapa en vez de bandas negras
+  const nuevoVW = Math.round(clamp(VH * innerWidth / innerHeight, 420, 620));
+  if (nuevoVW !== VW) { VW = nuevoVW; low.width = VW; luz.width = VW; }
   ESC = Math.min(cv.width / VW, cv.height / VH);
   if (ESC >= 2) ESC = Math.floor(ESC * 2) / 2;
   OX = Math.floor((cv.width - VW * ESC) / 2); OY = Math.floor((cv.height - VH * ESC) / 2);
@@ -386,6 +389,7 @@ function iniciarJuego() {
 function guardarCheckpoint() {
   G.cp = { zona: G.zona, pts: G.pts, bajas: G.bajas, disparos: G.disparos, aciertos: G.aciertos, mun: P.mun.map(m => ({ ...m })),
     gran: Math.max(P.gran, 2), racha: G.racha, S: { ...S } };
+  guardarPartida();
 }
 function cargarCheckpoint() {
   const cp = G.cp;
@@ -760,6 +764,12 @@ function alPresionar(c) {
       if (c === 'ArrowLeft' || c === 'KeyA') { difIdx = Math.max(0, difIdx - 1); Snd.play('click'); }
       if (c === 'ArrowRight' || c === 'KeyD') { difIdx = Math.min(2, difIdx + 1); Snd.play('click'); }
       if (c === 'Enter' || c === 'Space') iniciarJuego();
+      if (c === 'KeyH') abrirAyuda('titulo');
+      break;
+    case 'ayuda':
+      if (c === 'ArrowRight' || c === 'KeyD') G.ayudaPag = Math.min(AYUDA.length - 1, G.ayudaPag + 1);
+      if (c === 'ArrowLeft' || c === 'KeyA') G.ayudaPag = Math.max(0, G.ayudaPag - 1);
+      if (c === 'Escape' || c === 'Enter') cerrarAyuda();
       break;
     case 'jugando':
       if (c === 'Digit1') cambiarArma(0); if (c === 'Digit2') cambiarArma(1); if (c === 'Digit3') cambiarArma(2);
@@ -834,7 +844,7 @@ function actualizar(dt) {
     cam.x = (Math.sin(NOW * 0.05) * 0.5 + 0.5) * (WW - VW); cam.y = 300 + Math.sin(NOW * 0.13) * 120;
     return;
   }
-  if (G.estado === 'pausa') return;
+  if (G.estado === 'pausa' || G.estado === 'ayuda') return;
   if (G.estado === 'muerto') { G.muerteT += dt; actualizarEfectos(dt * 0.4); return; }
   if (G.estado === 'victoria') { G.ganoT += dt; actualizarHeli(dt); actualizarEfectos(dt); return; }
 
@@ -1051,7 +1061,7 @@ function actualizarHeli(dt) {
   if (heli.sonT <= 0) { heli.sonT = 0.09; Snd.play('helice', clamp(1 - dist(heli.x, heli.y, P.x, P.y) / 700, 0.15, 1)); }
 }
 function ganar() {
-  G.estado = 'victoria'; G.ganoT = 0; Snd.play('victoria');
+  G.estado = 'victoria'; G.ganoT = 0; Snd.play('victoria'); borrarPartida();
   G.nuevoRecord = G.pts > record;
   if (G.nuevoRecord) { record = G.pts; try { localStorage.setItem('faro_record', record); } catch (e) {} }
 }
@@ -1126,7 +1136,7 @@ function render() {
     if (e.hp < e.maxhp && !e.T.jefe) { lx.fillStyle = '#300'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12, 2); lx.fillStyle = '#e03030'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12 * e.hp / e.maxhp, 2); }
   }
   // Jugador
-  if (G.estado !== 'titulo' && !P.oculto && G.estado !== 'muerto') {
+  if (!enMenu() && !P.oculto && G.estado !== 'muerto') {
     dibujarSoldado(lx, P.x, P.y, P.ang, P.r, '#3f7a3a', '#2e5a2b', P.arma === 2 ? 10 : P.arma === 1 ? 9 : 5, false, P.paso);
     if (P.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(P.x - 8, P.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(P.x - 8, P.y - 13, 16 * (1 - P.recarga / ARMAS[P.arma].recarga), 2); }
   }
@@ -1170,7 +1180,7 @@ function render() {
   circ(220, 425, 90 + Math.sin(NOW * 13) * 3, 0.55); // lámpara de la cabaña
   for (const e of estaciones) circ(e.x, e.y, 26, e.cd > 0 ? 0.2 : 0.55);
   for (const it of items) circ(it.x, it.y, 14, 0.45);
-  if (G.estado !== 'titulo' && !P.oculto) {
+  if (!enMenu() && !P.oculto) {
     circ(P.x, P.y, 50, 0.85);
     if (G.estado !== 'muerto') cono(P.x, P.y, P.ang, 175, 0.42, 0.95);
   }
@@ -1243,11 +1253,18 @@ function render() {
   ctx.beginPath(); ctx.rect(0, 0, VW, VH); ctx.clip();
   G.botones = [];
   if (G.estado === 'titulo') dibujarTitulo();
+  else if (G.estado === 'ayuda') { if (G.ayudaDesde !== 'titulo') dibujarHUD(cx, cy); dibujarAyuda(); }
   else {
     dibujarHUD(cx, cy);
     if (G.estado === 'pausa') dibujarPausa();
     if (G.estado === 'muerto') dibujarMuerte();
     if (G.estado === 'victoria') dibujarVictoria();
+  }
+  // Celular parado: pedimos girarlo
+  if (touch.activo && innerHeight > innerWidth) {
+    G.botones = []; caja(0, 0, VW, VH, 0.92);
+    txt('GIRÁ EL CELULAR', VW / 2, VH / 2 - 20, 14, '#ffe060', 'center');
+    txt('El juego se juega en horizontal', VW / 2, VH / 2 + 4, 7, '#ffffff', 'center');
   }
   if (!touch.activo) dibujarMira();
   ctx.restore();
@@ -1269,9 +1286,13 @@ function dibujarHeli(g, x, y, alt) {
 // ---------- Texto e interfaz ----------
 // La fuente pixelada no trae mayúsculas con tilde: las cambiamos por las versiones que sí tiene
 const SIN_TILDE = { 'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U', 'Ñ': 'ñ' };
-function txt(s, x, y, size = 8, color = '#fff', align = 'left') {
+// Escribe texto; si no entra en maxW, achica la letra para que nunca se salga
+function txt(s, x, y, size = 8, color = '#fff', align = 'left', maxW = VW - 12) {
   s = String(s).replace(/[ÁÉÍÓÚÑ]/g, c => SIN_TILDE[c]);
-  ctx.font = `${size}px "Press Start 2P", monospace`; ctx.textAlign = align; ctx.textBaseline = 'top';
+  ctx.font = `${size}px "Press Start 2P", monospace`;
+  const ancho = ctx.measureText(s).width;
+  if (ancho > maxW) { const ns = size * maxW / ancho; y += (size - ns) / 2; size = ns; ctx.font = `${size}px "Press Start 2P", monospace`; }
+  ctx.textAlign = align; ctx.textBaseline = 'top';
   ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillText(s, x + Math.max(0.6, size / 8), y + Math.max(0.6, size / 8));
   ctx.fillStyle = color; ctx.fillText(s, x, y);
 }
@@ -1280,7 +1301,7 @@ function boton(label, x, y, w, h, fn, activo = false, size = 8) {
   const hover = !touch.activo && mouse.x >= x && mouse.x <= x + w && mouse.y >= y && mouse.y <= y + h;
   ctx.fillStyle = activo ? '#b02828' : hover ? '#3a3a48' : 'rgba(20,20,30,0.85)'; ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = activo || hover ? '#ffe060' : '#666'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  txt(label, x + w / 2, y + (h - size) / 2 + 1, size, '#fff', 'center');
+  txt(label, x + w / 2, y + (h - size) / 2 + 1, size, '#fff', 'center', w - 8);
   G.botones.push({ x, y, w, h, fn: () => { Snd.play('click'); fn(); } });
 }
 function dibujarMira() {
@@ -1445,14 +1466,14 @@ function dibujarTouch() {
     const dx = s.x - s.ox, dy = s.y - s.oy, d = Math.hypot(dx, dy), k = d > 22 ? 22 / d : 1;
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(s.ox + dx * k, s.oy + dy * k, 9, 0, 7); ctx.fill();
   }
-  const bts = [['G', VW - 24, VH - 64, tirarGranada], ['R', VW - 52, VH - 64, recargar], ['Q', VW - 80, VH - 64, () => cambiarArma(P.arma + 1)], ['E', VW - 108, VH - 64, usarCaja]];
+  const bts = [['G', VW - 22, VH - 60, tirarGranada], ['R', VW - 22, VH - 96, recargar], ['Q', VW - 56, VH - 60, () => cambiarArma(P.arma + 1)], ['E', VW - 56, VH - 96, usarCaja]];
   for (const [l, x, y, fn] of bts) {
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.arc(x, y, 11, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.stroke(); txt(l, x, y - 3, 7, '#fff', 'center');
-    G.botones.push({ x: x - 12, y: y - 12, w: 24, h: 24, fn });
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(x, y, 15, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1; ctx.stroke(); txt(l, x, y - 4, 8, '#fff', 'center');
+    G.botones.push({ x: x - 17, y: y - 17, w: 34, h: 34, fn });
   }
-  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(VW - 150, 6, 18, 16); txt('II', VW - 141, 10, 6, '#fff', 'center');
-  G.botones.push({ x: VW - 150, y: 6, w: 18, h: 16, fn: () => G.estado = 'pausa' });
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(VW - 156, 4, 24, 22); txt('II', VW - 144, 11, 7, '#fff', 'center');
+  G.botones.push({ x: VW - 158, y: 2, w: 28, h: 26, fn: () => G.estado = 'pausa' });
 }
 
 function dibujarTitulo() {
@@ -1464,22 +1485,78 @@ function dibujarTitulo() {
   txt('DIFICULTAD', VW / 2, 98, 6, '#ffe060', 'center');
   DIFICULTADES.forEach((d, i) => boton(d.nombre, VW / 2 - 117 + i * 80, 108, 74, 16, () => difIdx = i, i === difIdx, 6));
   const pul = Math.floor(NOW * 2.5) % 2;
-  boton(touch.activo ? 'TOCÁ PARA JUGAR' : 'JUGAR  [ENTER]', VW / 2 - 70, 132, 140, 22, iniciarJuego, pul === 1, 8);
-  const ctrl = touch.activo ? [
-    'Joystick izquierdo: mover · derecho: apuntar y disparar',
-    'G granada · R recargar · Q cambiar arma · E caja de munición',
-    'Tocá las rachas (abajo a la izquierda) para usarlas',
-  ] : [
-    'WASD mover · MOUSE apuntar · CLICK disparar · SHIFT correr',
-    'R recargar · 1/2/3 o Q o ruedita: armas · G o CLICK DER: granada',
-    'E caja de munición · Z dron · X ataque aéreo · C torreta',
-    'P pausa · M sonido. Si no te pegan por un rato, te curás.',
-  ];
-  caja(20, 162, VW - 40, 12 + ctrl.length * 9, 0.55);
-  ctrl.forEach((l, i) => txt(l, VW / 2, 168 + i * 9, 5, '#a8b8a0', 'center'));
-  txt('Idea y código original: BRUNO (12 años)', VW / 2, VH - 26, 6, '#ffe060', 'center');
-  txt(`RÉCORD: ${record}`, VW / 2, VH - 14, 5, '#888', 'center');
-  G.botones.push({ x: 0, y: 150, w: VW, h: VH - 150, fn: () => { if (touch.activo) iniciarJuego(); } });
+  const save = leerPartida();
+  if (save) {
+    boton(touch.activo ? 'NUEVA PARTIDA' : 'NUEVA  [ENTER]', VW / 2 - 150, 132, 145, 24, iniciarJuego, false, 8);
+    boton(`CONTINUAR ZONA ${save.zona + 1}`, VW / 2 + 5, 132, 145, 24, continuarPartida, pul === 1, 8);
+  } else boton(touch.activo ? 'JUGAR' : 'JUGAR  [ENTER]', VW / 2 - 70, 132, 140, 24, iniciarJuego, pul === 1, 8);
+  boton('CÓMO JUGAR', VW / 2 - 70, 164, 140, 20, () => abrirAyuda('titulo'), false, 7);
+  txt(touch.activo ? 'Jugá con el celular acostado' : 'Click en la pantalla y usá teclado + mouse', VW / 2, 192, 5, '#a8b8a0', 'center');
+  txt('Idea y código original: BRUNO (12 años)', VW / 2, VH - 30, 6, '#ffe060', 'center');
+  txt(`RÉCORD: ${record}` + (save ? '   ·   PROGRESO GUARDADO' : ''), VW / 2, VH - 16, 5, '#888', 'center');
+}
+
+const enMenu = () => G.estado === 'titulo' || (G.estado === 'ayuda' && G.ayudaDesde === 'titulo');
+// ---------- Instrucciones ----------
+const AYUDA = [
+  { t: 'LA MISIÓN', l: [
+    'Tu escuadrón llegó a una isla con un faro abandonado.',
+    'Hay 4 zonas: CABAÑA, BOSQUECITO, COSTA y FARO.',
+    'En cada zona aguantás 2 oleadas de enemigos.',
+    'Al limpiar una zona se abre el portón rojo: seguí la flecha.',
+    'En el faro aguantás 60 segundos y llega el helicóptero.',
+    'Corré a la H para escapar y ganar.',
+    'Si perdés, reintentás desde la zona donde estabas.' ] },
+  { t: 'CONTROLES EN COMPU', l: [
+    'WASD o flechas: moverse      SHIFT: correr',
+    'Mouse: apuntar               Click: disparar',
+    'Click derecho o G: tirar granada',
+    'R: recargar     1 / 2 / 3, Q o ruedita: cambiar arma',
+    'E: usar caja de munición (cerca de la caja)',
+    'Z: dron    X: ataque aéreo (donde apuntás)    C: torreta',
+    'P o ESC: pausa      M: sonido' ] },
+  { t: 'CONTROLES EN CELULAR', l: [
+    'Poné el celular acostado (horizontal).',
+    'Dedo en la mitad IZQUIERDA: joystick para moverte.',
+    'Dedo en la mitad DERECHA: apuntás y disparás.',
+    'Botones: G granada, R recargar, Q arma, E caja.',
+    'Tocá DRON / AÉREO / TORRE (abajo a la izquierda)',
+    'cuando estén encendidos para usarlos.',
+    'II arriba: pausa.' ] },
+  { t: 'CONSEJOS', l: [
+    'Si no te pegan por 3 segundos, la vida se recupera sola.',
+    'Cubrite detrás de cajas, rocas, árboles y bolsas.',
+    'Láser rojo = ese enemigo está por disparar. ¡Movete!',
+    'Rachas: 3 bajas = dron, 6 = ataque aéreo, 10 = torreta.',
+    'La pistola nunca se queda sin balas.',
+    'Los enemigos sueltan munición, botiquines y granadas.',
+    'Tu avance se guarda solo al entrar a cada zona.' ] },
+];
+function abrirAyuda(desde) { G.ayudaDesde = desde; G.ayudaPag = touch.activo && desde === 'titulo' ? 0 : 0; G.estado = 'ayuda'; }
+function cerrarAyuda() { G.estado = G.ayudaDesde || 'titulo'; }
+function dibujarAyuda() {
+  caja(0, 0, VW, VH, 0.85);
+  const p = AYUDA[G.ayudaPag];
+  txt('CÓMO JUGAR', VW / 2, 12, 8, '#888', 'center');
+  txt(p.t, VW / 2, 28, 12, '#ffe060', 'center');
+  caja(16, 50, VW - 32, 150, 0.5);
+  p.l.forEach((l, i) => txt(l, 26, 60 + i * 20, 6, '#e0e8d8', 'left', VW - 52));
+  txt(`${G.ayudaPag + 1} / ${AYUDA.length}`, VW / 2, 212, 6, '#888', 'center');
+  const bw = 110;
+  if (G.ayudaPag > 0) boton('< ANTERIOR', VW / 2 - bw * 1.5 - 8, 230, bw, 22, () => G.ayudaPag--, false, 7);
+  boton('VOLVER', VW / 2 - bw / 2, 230, bw, 22, cerrarAyuda, false, 7);
+  if (G.ayudaPag < AYUDA.length - 1) boton('SIGUIENTE >', VW / 2 + bw / 2 + 8, 230, bw, 22, () => G.ayudaPag++, true, 7);
+}
+
+// ---------- Progreso guardado (en este navegador) ----------
+function guardarPartida() { try { localStorage.setItem('faro_partida', JSON.stringify({ ...G.cp, mun: G.cp.mun.map(m => ({ c: m.c, res: m.res === Infinity ? -1 : m.res })), dif: difIdx })); } catch (e) {} }
+function leerPartida() {
+  try { const s = JSON.parse(localStorage.getItem('faro_partida')); if (!s || !s.zona) return null; s.mun.forEach(m => { if (m.res < 0) m.res = Infinity; }); return s; } catch (e) { return null; }
+}
+function borrarPartida() { try { localStorage.removeItem('faro_partida'); } catch (e) {} }
+function continuarPartida() {
+  const s = leerPartida(); if (!s) return iniciarJuego();
+  iniciarJuego(); difIdx = s.dif ?? difIdx; G.cp = s; cargarCheckpoint();
 }
 
 function dibujarPausa() {
@@ -1487,9 +1564,10 @@ function dibujarPausa() {
   txt('PAUSA', VW / 2, 50, 16, '#ffe060', 'center');
   boton('SEGUIR', VW / 2 - 60, 90, 120, 20, () => G.estado = 'jugando');
   boton(Snd.mute ? 'SONIDO: NO' : 'SONIDO: SÍ', VW / 2 - 60, 116, 120, 20, () => Snd.toggle());
-  boton('SALIR AL MENÚ', VW / 2 - 60, 142, 120, 20, irTitulo);
-  txt('Consejo: los enemigos con láser rojo están por disparar.', VW / 2, 190, 5, '#c0c0c0', 'center');
-  txt('¡Movete o cubrite detrás de algo!', VW / 2, 200, 5, '#c0c0c0', 'center');
+  boton('CÓMO JUGAR', VW / 2 - 60, 142, 120, 20, () => abrirAyuda('pausa'));
+  boton('SALIR AL MENÚ', VW / 2 - 60, 168, 120, 20, irTitulo);
+  txt('Consejo: los enemigos con láser rojo están por disparar.', VW / 2, 206, 5, '#c0c0c0', 'center');
+  txt('¡Movete o cubrite detrás de algo!', VW / 2, 216, 5, '#c0c0c0', 'center');
 }
 function dibujarMuerte() {
   const a = Math.min(1, G.muerteT);
