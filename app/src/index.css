@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0a0e13; }
+  body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid #ffc174; outline-offset: 2px; }
+  button { font: inherit; color: inherit; }
+}
+@layer components {
+  /* Los íconos son SVG (Material Symbols Outlined), con tamaño de letra como en el diseño original */
+  .material-symbols-outlined { display: inline-block; width: 1em; height: 1em; font-size: 24px; line-height: 1; flex-shrink: 0; vertical-align: middle; }
+}
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
+
+/* El mundo del juego va al fondo y la interfaz (React) encima */
+#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: none; touch-action: none; background: #05070b; }
+#root { position: fixed; inset: 0; pointer-events: none; }
+
+.scroll-y { overflow-y: auto; overflow-x: hidden; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.scroll-x { overflow-x: auto; touch-action: pan-x; }
+
+@keyframes entrar { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes entrar-banner { from { opacity: 0; letter-spacing: 0.3em; } to { opacity: 1; } }
+.anim-entrar { animation: entrar 0.25s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .animate-pulse, .animate-ping, .anim-entrar { animation: none !important; } }

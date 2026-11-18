@@ -1,61 +1,67 @@
 # 🔦 Operación Faro Nocturno
 
-Shooter retro 8-bits con vista desde arriba, estilo supervivencia de Call of Duty.
-**Idea y código original: Bruno (12 años).**
+Shooter táctico con vista desde arriba, de noche, con amigos online.
+**Idea y código original: Bruno (BRUCO) 😎 — Propiedad intelectual: BRUCO.**
 
 ## 🎮 Jugar
 
-**Link del juego:** https://melioubi.github.io/Operaci-n-Faro-Nocturno/  
-Se puede instalar como app (botón INSTALAR APP en el menú, o "Agregar a inicio" en iPhone).
+**https://melioubi.github.io/Operaci-n-Faro-Nocturno/**
 
-Abrí el link de GitHub Pages del repo (o abrí `index.html` en el navegador). No hace falta instalar nada.
-Funciona en la compu (teclado + mouse) y también en tablet/celular (joysticks táctiles).
+Funciona en compu (teclado + mouse) y en celular (joysticks). Se puede **instalar como app** (botón INSTALAR APP, o "Agregar a inicio" en iPhone).
 
 ## 📖 Historia
 
-Tu escuadrón fue enviado a una isla con un faro abandonado. Un grupo enemigo tomó toda la zona.
-Tu misión: limpiar las 4 zonas, sobrevivir a las oleadas y defender el faro hasta que llegue el helicóptero de rescate.
+Tu escuadrón llegó a una isla con un faro abandonado y un grupo enemigo tomó la zona. Limpiá las 4 zonas (cabaña, bosquecito, costa rocosa y torre del faro), aguantá las oleadas y escapá en el helicóptero.
 
-1. 🏠 **La Cabaña**: punto de inicio, con caja de munición adentro
-2. 🌲 **El Bosquecito**: muchos árboles, te emboscan
-3. 🌊 **Costa rocosa**: espacio abierto, pocas coberturas
-4. 🗼 **Torre del faro**: oleadas finales, el Comandante enemigo y defensa de 60 segundos hasta el helicóptero
+## ✨ Qué tiene
 
-## 🕹️ Controles
+- **Modos:** Campaña (4 zonas), Supervivencia (oleadas infinitas), Cooperativo con amigos y Duelo por equipos (verde vs rojo). Los modos online usan bots que maneja la compu para completar equipos.
+- **Niveles y camuflajes:** la experiencia se guarda en cada dispositivo. Del nivel 1 al 10, con mejoras de vida, armas y camuflajes.
+- **Tienda** entre zonas, rachas de bajas (dron, ataque aéreo, torreta), perros y francotiradores.
+- **Salas online:** se crea una sala, se manda el link y los amigos entran. Conexión directa entre navegadores (WebRTC con PeerJS), sin servidor propio.
+- **Menús y HUD** con estética táctica: pestañas Jugar, Armería, Operadores, Niveles, Historial y Ayuda.
 
-| Acción | Teclado / mouse |
+## 🧰 Cómo está hecho
+
+| Parte | Tecnología |
 |---|---|
-| Moverse | WASD o flechas |
-| Correr | Shift |
-| Apuntar / disparar | Mouse / click izquierdo |
-| Granada | G o click derecho |
-| Recargar | R |
-| Cambiar arma | 1, 2, 3, Q o la ruedita |
-| Caja de munición | E |
-| Dron / Ataque aéreo / Torreta | Z / X / C |
-| Pausa / Sonido | P o Esc / M |
+| Mundo del juego (mapa, enemigos, disparos, luces) | Canvas 2D, en `app/src/engine/juego.js` |
+| Interfaz (menús, HUD, tienda, pausa) | React + Tailwind CSS, en `app/src/ui/` |
+| Compilación | Vite |
+| Multijugador | PeerJS (WebRTC) |
+| Sonido | Web Audio (chiptune generado por código, sin archivos) |
+| App instalable | `manifest.webmanifest` + `sw.js` |
 
-## ✨ Qué se agregó sobre el código original de Bruno
+**¿Por qué Vite + React y no Next.js?** El juego corre 100% en el navegador (usa canvas, teclado y toques) y GitHub Pages sólo sirve archivos. Next.js agrega un servidor y renderizado en el servidor que acá no hacen falta. Vite + React da los mismos componentes y estilos, compila más rápido y se publica como archivos simples.
 
-- Versión web: se juega desde el navegador, sin instalar Python ni pygame.
-- Mapa grande con las 4 zonas de la idea, portones que se abren al despejar cada zona y minimapa.
-- Gráficos 8-bits, noche oscura con linterna, faro giratorio y fogonazos que iluminan.
-- 4 armas de la idea: pistola (munición infinita), fusil M4, escopeta y granadas.
-- Regeneración de vida estilo COD: si no te pegan por 3,5 segundos te curás. Pantalla roja e indicador de dónde vienen los tiros.
-- Enemigos con IA: soldados que disparan y se cubren detrás de cosas cuando están heridos, corredores con cuchillo, pesados con escopeta y un jefe final que tira granadas. Antes de disparar muestran un láser rojo, así los podés esquivar.
-- Las rachas de bajas de Bruno ahora funcionan: x3 dron que te sigue y dispara, x6 ataque aéreo de un avión, x10 torreta.
-- Cajas de munición, botiquines y granadas que sueltan los enemigos.
-- Puntos, hitmarkers, mensajes de radio, helicóptero que aterriza, final bueno y malo, rangos y récord.
-- Pantalla "Cómo jugar", se adapta a celular (horizontal) y compu, y el avance se guarda solo en el navegador (botón CONTINUAR).
-- Experiencia y niveles (1 a 10) que desbloquean vida, mejoras de armas, granadas y camuflajes.
-- Tienda entre zonas para gastar puntos, perros, francotiradores con láser largo y modo SUPERVIVENCIA con oleadas infinitas.
-- Multijugador online con amigos (botón CON AMIGOS): se crea una sala con link para invitar. Modos COOPERATIVO (todos contra la compu) y EQUIPOS (verde vs rojo), con bots que maneja la compu. Usa conexión directa entre navegadores (WebRTC con PeerJS).
-- Checkpoint al entrar a cada zona, 3 dificultades y música y sonidos chiptune generados por código.
+El motor del juego es un único archivo y se comunica con React mediante una "foto" del estado (`store`) y una lista de órdenes (`API`). Eso permite cambiar toda la interfaz sin tocar la lógica del juego.
 
-## 🧠 Notas para Bruno (cosas que aprendimos de tu código)
+## 🛠️ Para modificarlo
+
+Hace falta [Node.js](https://nodejs.org) 20 o más nuevo.
+
+```bash
+cd app
+npm install        # una sola vez
+npm run dev        # abre el juego en http://localhost:5173 (se actualiza solo al guardar)
+```
+
+Para probar cosas desde la consola del navegador, agregá `?debug` a la dirección.
+
+### Publicar los cambios
+
+GitHub Pages sirve lo que está en la raíz del repo, así que después de cambiar algo:
+
+```bash
+cd app
+npm run publicar   # compila y copia el resultado a la raíz del repo
+```
+
+Después hacé commit y push de todo (incluida la carpeta `assets/` y `index.html` de la raíz).
+
+## 🧠 Notas para Bruno (cosas que aprendimos de tu código original)
 
 - `pygame.font.SysFont(...)` estaba adentro del `while`, así que creaba la fuente 60 veces por segundo. Conviene crearla una sola vez antes del loop.
-- En el `for b in balas[:]` adentro del `for e in enemigos[:]`, si un enemigo moría, el `break` sólo salía del loop de balas. Estaba bien pensado, pero cuando hay muchas cosas que se borran a la vez conviene marcar `muerto = True` y limpiar la lista al final.
 - La vida podía pasar de 100 porque se sumaba `0.04` sin tope. Se arregla con `vida = min(max_vida, vida + 0.04)`.
 - Las rachas (`bajas == 3`) sólo mostraban un cartel. Ahora cada una hace algo.
 - Las coberturas se dibujaban, pero las balas y los personajes las atravesaban. En la versión nueva hay colisiones con todo.
