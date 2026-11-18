@@ -97,3 +97,7 @@ Después hacé commit y push de todo (incluida la carpeta `assets/` y `index.htm
 - Las coberturas se dibujaban, pero las balas y los personajes las atravesaban. En la versión nueva hay colisiones con todo.
 
 Tu código original está en [`original/juego_bruno.py`](original/juego_bruno.py).
+
+## Créditos de música
+
+Pistas con licencia CC0 (OpenGameArt): "Heavy Battle 2" (MintoDog) en la partida e "Insistent" (yd) en el menú.

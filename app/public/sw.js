@@ -1,6 +1,6 @@
 // Service worker: permite instalar el juego como app y jugar sin internet (modo solo).
 // Para el juego usa "red primero": si hay internet baja la última versión, si no, usa la guardada.
-const CACHE = 'faro-nocturno-v6';
+const CACHE = 'faro-nocturno-v7';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './iconos/icono-192.png', './iconos/icono-512.png', './iconos/icono-180.png', './iconos/icono-32.png'];
 
 self.addEventListener('install', e => {

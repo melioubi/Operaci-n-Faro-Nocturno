@@ -93,7 +93,7 @@ const Snd = {
     const ac = this.ac = new AC();
     this.out = ac.createGain(); this.out.gain.value = 0.5; this.out.connect(ac.destination);
     this.sfx = ac.createGain(); this.sfx.connect(this.out);
-    this.mus = ac.createGain(); this.mus.gain.value = 0.2; this.mus.connect(this.out);
+    this.mus = ac.createGain(); this.mus.gain.value = 0.5; this.mus.connect(this.out);
     const b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     this.nb = b; Musica.start();
@@ -145,10 +145,10 @@ const Snd = {
   toggle() { this.mute = !this.mute; if (this.out) this.out.gain.value = this.mute ? 0 : 0.5; }
 };
 // ---------- Música: ambiente (menú, estilo shooter militar), metal (partida, estilo DOOM) y 8 bits ----------
-const MUS_ESTILOS = ['ambiente', 'metal', '8bit', 'off'];
-const MUS_DEF = { menu: 'ambiente', juego: 'metal', vol: 0.7 };
-const musCfg = (() => { try { const o = JSON.parse(localStorage.getItem('faro_mus')); if (o && MUS_ESTILOS.includes(o.menu) && MUS_ESTILOS.includes(o.juego)) return { ...MUS_DEF, ...o }; } catch (e) { /* sin guardado */ } return { ...MUS_DEF }; })();
-function guardarMus() { try { localStorage.setItem('faro_mus', JSON.stringify(musCfg)); } catch (e) { /* sin guardado */ } }
+const MUS_ESTILOS = ['pistas', 'ambiente', 'metal', '8bit', 'off'];
+const MUS_DEF = { menu: 'pistas', juego: 'pistas', vol: 0.9 };
+const musCfg = (() => { try { const o = JSON.parse(localStorage.getItem('faro_mus2')); if (o && MUS_ESTILOS.includes(o.menu) && MUS_ESTILOS.includes(o.juego)) return { ...MUS_DEF, ...o }; } catch (e) { /* sin guardado */ } return { ...MUS_DEF }; })();
+function guardarMus() { try { localStorage.setItem('faro_mus2', JSON.stringify(musCfg)); } catch (e) { /* sin guardado */ } }
 const Musica = {
   timer: null, paso: 0, prox: 0, estilo: null, bus: null, gtr: null, dly: null,
   estiloActual() {
@@ -172,14 +172,29 @@ const Musica = {
   },
   vol() { const k = { ambiente: 1.1, metal: 0.9, '8bit': 1 }[this.estilo] || 1; if (this.bus) this.bus.gain.value = (musCfg.vol * k); },
   start() { if (this.timer || !Snd.ac) return; this.armar(); this.prox = Snd.ac.currentTime + 0.1; this.timer = setInterval(() => this.tick(), 40); },
+  pistaEl: {},
+  pistas(est) {          // música real (archivos con licencia libre) en un <audio> que se repite
+    const e = G ? G.estado : 'titulo', ctx = (e === 'titulo' || e === 'sala' || e === 'pausa' || e === 'ayuda' || e === 'tienda') ? 'menu' : 'juego';
+    const url = import.meta.env.BASE_URL + (ctx === 'menu' ? 'musica/menu1.ogg' : 'musica/metal1.mp3');
+    for (const k of ['menu', 'juego']) {
+      let a = this.pistaEl[k];
+      if (est === 'pistas' && k === ctx && !Snd.mute) {
+        if (!a) { a = this.pistaEl[k] = new Audio(import.meta.env.BASE_URL + (k === 'menu' ? 'musica/menu1.ogg' : 'musica/metal1.mp3')); a.loop = true; }
+        a.volume = clamp(musCfg.vol, 0, 1);
+        if (a.paused) { const p = a.play(); if (p && p.catch) p.catch(() => {}); }
+      } else if (a && !a.paused) a.pause();
+    }
+    return url;
+  },
   tick() {
     const ac = Snd.ac, est = this.estiloActual();
+    this.pistas(est);
     if (est !== this.estilo) { this.estilo = est; this.paso = 0; this.prox = Math.max(this.prox, ac.currentTime + 0.05); }
     this.vol();
     const bpm = est === 'metal' ? 174 : est === 'ambiente' ? 84 : 128, spb = 60 / bpm / 4;
     while (this.prox < ac.currentTime + 0.15) {
       const w = Math.max(0, this.prox - ac.currentTime);
-      if (!Snd.mute && est !== 'off') { if (est === 'metal') this.metal(this.paso, w, spb); else if (est === 'ambiente') this.ambiente(this.paso, w, spb); else this.chip(this.paso, w); }
+      if (!Snd.mute && est !== 'off' && est !== 'pistas') { if (est === 'metal') this.metal(this.paso, w, spb); else if (est === 'ambiente') this.ambiente(this.paso, w, spb); else this.chip(this.paso, w); }
       this.prox += spb; this.paso = (this.paso + 1) % 128;
     }
   },

@@ -13,11 +13,16 @@ export function Preview({ paleta, tam = 96, bloqueado, arma = 1 }) {
   return <canvas ref={ref} width={tam} height={tam} className={bloqueado ? 'opacity-30 grayscale' : ''} style={{ width: tam, height: tam }} aria-hidden="true" />;
 }
 
+// Fotos de los operadores (personas reales, del arte de la escuadra OMEGA). Los demás reusan una con otro tono.
+const B = import.meta.env.BASE_URL + 'fondos/';
+const FOTO = { faro: [B + 'op_faro.jpg', ''], sombra: [B + 'op_sombra.jpg', ''], viper: [B + 'op_viper.jpg', ''], valkiria: [B + 'op_valkiria.jpg', ''],
+  hielo: [B + 'op_faro.jpg', 'hue-rotate(160deg)'], cobra: [B + 'op_viper.jpg', 'hue-rotate(-40deg) saturate(1.4)'], nova: [B + 'op_sombra.jpg', 'hue-rotate(70deg)'], leyenda: [B + 'op_valkiria.jpg', 'sepia(0.6) saturate(1.8)'] };
 const REM_VISTA = { destello: ['#fff2b0', '#ffd040'], ceniza: ['#888', '#555', '#ddd'], rayo: ['#80e0ff', '#ffffff', '#40a0ff'], brasas: ['#ff8020', '#ff4010', '#ffd040'], toxico: ['#80ff40', '#40c020'] };
 const ARMA_IDX = { PISTOLA: 0, 'FUSIL M4': 1, ESCOPETA: 2 };
 const hint = (f, irA) => (f.tipo === 'tienda' ? <button onClick={() => irA('tienda')} className="underline text-primary">Comprala en la TIENDA</button> : f.tipo === 'pase' ? <button onClick={() => irA('pase')} className="underline text-primary">Se gana en el PASE DE BATALLA</button> : null);
 
-function Mini({ pal, w = 56, h = 72, bloqueado }) {
+function Mini({ pal, w = 56, h = 72, bloqueado, id }) {
+  if (id && FOTO[id]) return <img src={FOTO[id][0]} alt="" style={{ width: w, height: h, filter: FOTO[id][1] }} className={`object-cover object-top rounded ${bloqueado ? 'opacity-30 grayscale' : ''}`} />;
   const ref = useRef(null);
   useEffect(() => { if (ref.current) dibujarRetrato(ref.current, pal, 0.5, {}); }, [pal]);
   return <canvas ref={ref} width={w * 2} height={h * 2} style={{ width: w, height: h }} className={bloqueado ? 'opacity-30 grayscale' : ''} aria-hidden="true" />;
@@ -124,7 +129,7 @@ export default function Operadores({ f, irA }) {
               return (
                 <button key={y.id} onClick={() => { API.click(); setSel(y.id); setPanel(null); }} aria-pressed={sel === y.id}
                   className={`relative shrink-0 w-44 lg:w-full flex items-center gap-space-sm rounded-lg p-space-xs text-left transition-all border-l-2 ${sel === y.id ? 'bg-surface-container-high border-primary' : 'bg-surface-container-low hover:bg-surface-container border-transparent'}`}>
-                  <div className="bg-surface-container rounded"><Mini pal={y.paleta} bloqueado={!ok} w={44} h={56} /></div>
+                  <div className="bg-surface-container rounded"><Mini id={y.id} pal={y.paleta} bloqueado={!ok} w={44} h={56} /></div>
                   <div className="min-w-0 flex-1">
                     <div className="font-label-lg text-label-lg text-on-surface uppercase font-bold leading-tight truncate">{y.n.replace(/"/g, '')}</div>
                     <div className="font-label-sm text-label-sm text-on-surface-variant uppercase truncate">{y.rol}</div>
@@ -153,7 +158,7 @@ export default function Operadores({ f, irA }) {
               </div>
               <div className="hidden sm:flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container-lowest/70 rounded px-space-xs py-0.5"><Icon n="rotate_right" className="text-sm" />ARRASTRÁ PARA GIRAR 360°</div>
             </div>
-            <div className={`relative h-[360px] md:h-[460px] flex items-end ${mio ? '' : 'brightness-50 saturate-50'}`}><Heroe pal={pal} arma={ARMA_IDX[x.arma] ?? 1} rafaga={rafaga} /></div>
+            <div className={`relative h-[360px] md:h-[460px] flex items-end ${mio ? '' : 'brightness-50 saturate-50'}`}>{FOTO[o.id] ? <img src={FOTO[o.id][0]} alt={o.n} style={{ filter: FOTO[o.id][1] }} className="h-full w-auto object-contain" /> : <Heroe pal={pal} arma={ARMA_IDX[x.arma] ?? 1} rafaga={rafaga} />}</div>
           </div>
           <div className="flex items-center gap-space-xs flex-wrap">
             {mio

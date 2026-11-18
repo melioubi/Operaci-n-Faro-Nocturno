@@ -9,6 +9,7 @@ const VISTAS = [
   { id: 'clasica', t: 'CLÁSICA', i: 'map', d: 'La vista plana de siempre.' },
 ];
 const MUSICAS = [
+  { id: 'pistas', t: 'PISTAS REALES', d: 'Música grabada: oscura en el menú, metal en la partida' },
   { id: 'ambiente', t: 'AMBIENTE TÁCTICO', d: 'Pads oscuros y pulso lejano (menú)' },
   { id: 'metal', t: 'METAL (DOOM)', d: 'Riffs graves y doble bombo (partida)' },
   { id: '8bit', t: '8 BITS', d: 'El sonido original' },
@@ -31,7 +32,7 @@ function Opciones({ lista, valor, onElegir }) {
 const Titulo = ({ children, color = 'bg-primary' }) => <div className="flex items-center gap-2 pt-space-xs"><span className={`w-1.5 h-3.5 ${color}`}></span><h3 className="font-headline-md text-headline-md tracking-wider text-on-surface uppercase">{children}</h3></div>;
 
 export function AjustesContenido({ f }) {
-  const m = f.musica || { menu: 'ambiente', juego: 'metal', vol: 0.7 };
+  const m = f.musica || { menu: 'pistas', juego: 'pistas', vol: 0.9 };
   return (
     <div className="flex flex-col gap-space-sm">
       <Titulo>VISTA DE LA CÁMARA</Titulo>
