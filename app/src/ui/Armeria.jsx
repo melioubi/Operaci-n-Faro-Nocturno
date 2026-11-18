@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Icon } from './Icon.jsx';
 import { API, setPestanaInicial, usePerfil } from './comun.js';
-import { ARMAS_BASE, NOMBRE_MOD, SLOTS, accesoriosDe, barrasArma, modsDe, slotsDe, statsArma, textoFuente, ITEMS, OPERADOR_POR_ID } from '../progreso/catalogo.js';
-import { accesoriosEquipados, equiparAccesorio, opActivo, restablecerArma, tiene } from '../progreso/perfil.js';
+import { EVO_FASES, EVO_UMBRALES, SKINS, evoNivel, ARMAS_BASE, NOMBRE_MOD, SLOTS, accesoriosDe, barrasArma, modsDe, slotsDe, statsArma, textoFuente, ITEMS, OPERADOR_POR_ID } from '../progreso/catalogo.js';
+import { bajasSkin, equiparSkin, skinActiva, accesoriosEquipados, equiparAccesorio, opActivo, restablecerArma, tiene } from '../progreso/perfil.js';
 import { IMG_FUSIL } from './datos.js';
 
 // ---------- Dibujos de las armas (planos) ----------
@@ -74,6 +74,34 @@ function Callout({ punto, slot, acc, onClick, izq }) {
   );
 }
 
+
+// ---------- Aspectos evolutivos (crecen con tus bajas) ----------
+function Aspectos({ arma, irA }) {
+  usePerfil();
+  const lista = SKINS.filter(s => s.arma === arma), activa = skinActiva(arma);
+  if (!lista.length) return null;
+  return (
+    <div className="relative z-20 bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
+      <div className="flex items-center gap-2"><Icon n="star" className="text-primary text-lg" /><span className="font-label-md text-label-md text-primary tracking-widest uppercase font-bold">ASPECTOS EVOLUTIVOS · {ARMAS_BASE[arma].nombre}</span></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-xs">
+        <button onClick={() => { API.click(); equiparSkin(arma, null); }} aria-pressed={!activa} className={`rounded p-space-sm text-left ${!activa ? 'bg-surface-container-high ring-1 ring-primary' : 'bg-surface-container hover:bg-surface-container-high'}`}>
+          <div className="font-label-lg text-label-lg text-on-surface uppercase font-bold">ESTÁNDAR</div><div className="font-label-sm text-label-sm text-on-surface-variant">Sin aspecto</div></button>
+        {lista.map(s => {
+          const ok = tiene(s.id), b = bajasSkin(s.id), ev = evoNivel(b), sig = EVO_UMBRALES[ev];
+          return (
+            <button key={s.id} onClick={() => { if (!ok) { irA(s.fuente.tipo === 'tienda' ? 'tienda' : 'pase'); return; } API.click(); equiparSkin(arma, s.id); }} aria-pressed={activa === s.id}
+              className={`rounded p-space-sm text-left flex flex-col gap-1 ${activa === s.id ? 'bg-surface-container-high ring-1 ring-primary' : 'bg-surface-container hover:bg-surface-container-high'} ${ok ? '' : 'opacity-60'}`}>
+              <div className="flex gap-0.5">{s.colores.map((c, k) => <span key={k} className={`flex-1 h-2.5 rounded-sm ${ok && k >= ev ? 'opacity-25' : ''}`} style={{ background: c }}></span>)}</div>
+              <div className="font-label-lg text-label-lg text-on-surface uppercase font-bold leading-tight">{s.n}</div>
+              <div className="font-label-sm text-label-sm text-on-surface-variant">{ok ? `Fase ${EVO_FASES[ev - 1]} · ${b} bajas${sig ? ` · próxima: ${sig}` : ' · ¡MÁXIMA!'}` : textoFuente(s.fuente)}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Armeria({ f, irA }) {
   const p = usePerfil();
   const [arma, setArma] = useState(1);
@@ -124,6 +152,7 @@ export default function Armeria({ f, irA }) {
           </button>
         ))}
       </div>
+      <Aspectos arma={arma} irA={irA} />
 
       {/* Fila superior: ficha y telemetría */}
       <div className="relative z-20 grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">

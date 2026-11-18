@@ -3,12 +3,13 @@
 // Es un objeto único. Cuando cambia, se guarda y avisa a quien esté escuchando (la interfaz).
 // =====================================================================
 import { almacen } from './almacen.js';
-import { CONFIG, ITEMS, NIVEL_MAX, XP_ESCALA, nivelDeXp, perksDe, recompensasPase, slotsDe, productosTienda } from './catalogo.js';
+import { CONFIG, ITEMS, REMATES, NIVEL_MAX, XP_ESCALA, nivelDeXp, perksDe, recompensasPase, slotsDe, productosTienda } from './catalogo.js';
 
 const base = () => ({
   v: 2, xp: 0, creditos: 0, fichas: 0,
   desbloqueos: {},
-  equipado: { operador: 'faro', camo: 'bosque', armeria: { 0: {}, 1: {}, 2: {} } },
+  equipado: { operador: 'faro', camo: 'bosque', armeria: { 0: {}, 1: {}, 2: {} }, skins: { 0: null, 1: null, 2: null }, remate: 'destello' },
+  skinBajas: {},
   pase: { premium: false, libre: {}, prem: {} },
   stats: { partidas: 0, victorias: 0, bajas: 0 },
   maestria: { 0: 0, 1: 0, 2: 0 },
@@ -20,7 +21,7 @@ function migrar(p) {
   if (!p || typeof p !== 'object') return b;
   if (p.v === 2) {
     return { ...b, ...p, equipado: { ...b.equipado, ...p.equipado, armeria: { 0: {}, 1: {}, 2: {}, ...(p.equipado && p.equipado.armeria) } },
-      pase: { ...b.pase, ...p.pase }, stats: { ...b.stats, ...p.stats }, maestria: { ...b.maestria, ...p.maestria }, desbloqueos: { ...p.desbloqueos } };
+      skinBajas: { ...p.skinBajas }, pase: { ...b.pase, ...p.pase }, stats: { ...b.stats, ...p.stats }, maestria: { ...b.maestria, ...p.maestria }, desbloqueos: { ...p.desbloqueos } };
   }
   b.xp = Math.floor((+p.xp || 0) * XP_ESCALA);      // la XP vieja valía más: se pasa a la escala nueva
   b.stats = { ...b.stats, ...p.stats };
@@ -73,6 +74,23 @@ export function equiparAccesorio(arma, slot, id) {      // id = null para sacarl
   e[slot] = id; guardarPerfil(); return true;
 }
 export function restablecerArma(arma) { perfil.equipado.armeria[arma] = {}; guardarPerfil(); }
+
+// ---------- Aspectos evolutivos y remates ----------
+export const skinActiva = arma => { const id = perfil.equipado.skins && perfil.equipado.skins[arma]; return id && tiene(id) ? id : null; };
+export const bajasSkin = id => (perfil.skinBajas && perfil.skinBajas[id]) || 0;
+export function equiparSkin(arma, id) {          // id = null para sacarla
+  if (!perfil.equipado.skins) perfil.equipado.skins = { 0: null, 1: null, 2: null };
+  if (id === null) { perfil.equipado.skins[arma] = null; guardarPerfil(); return true; }
+  const s = ITEMS[id]; if (!s || s.tipo !== 'skin' || s.arma !== arma || !tiene(id)) return false;
+  perfil.equipado.skins[arma] = id; guardarPerfil(); return true;
+}
+export function acreditarSkins(n = 1) {          // cada baja hace crecer los aspectos equipados (se guarda con el próximo cambio)
+  if (!perfil.skinBajas) perfil.skinBajas = {};
+  for (const a of [0, 1, 2]) { const id = skinActiva(a); if (id) perfil.skinBajas[id] = (perfil.skinBajas[id] || 0) + n; }
+}
+export const remateOk = r => nivelPerfil() >= r.nivel;
+export const remateActivo = () => { const r = REMATES.find(x => x.id === perfil.equipado.remate); return r && remateOk(r) ? r.id : 'ninguno'; };
+export function equiparRemate(id) { const r = REMATES.find(x => x.id === id); if (!r || !remateOk(r)) return false; perfil.equipado.remate = id; guardarPerfil(); return true; }
 
 // ---------- Tienda ----------
 // Los productos con "fichas" son los PREMIUM: hoy se prueban gratis; cuando CONFIG.COBRAR sea true

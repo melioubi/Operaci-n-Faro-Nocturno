@@ -39,3 +39,7 @@
 #c.nvg-activo { filter: saturate(1.6) contrast(1.35) brightness(2.1) hue-rotate(85deg) sepia(0.6); }
 .clip-bezel-corner { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
 @media (prefers-reduced-motion: reduce) { .radar-sweep-beam { animation: none; } }
+
+@keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.anim-ticker { animation: ticker 40s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .anim-ticker { animation: none; } }

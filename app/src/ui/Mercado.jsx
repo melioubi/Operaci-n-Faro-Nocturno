@@ -29,14 +29,15 @@ function Producto({ it, p }) {
       {premium && <span className="absolute top-2 right-2 bg-tertiary/20 text-tertiary font-label-sm text-label-sm px-1.5 py-0.5 rounded font-bold flex items-center gap-1"><Icon n="workspace_premium" className="text-xs" />PREMIUM</span>}
       <div className="flex items-center gap-space-sm">
         <div className="w-20 h-20 rounded bg-surface-container flex items-center justify-center shrink-0">
-          {paleta ? <Preview paleta={paleta} tam={64} /> : <Icon n="tune" className="text-primary text-4xl" />}
+          {paleta ? <Preview paleta={paleta} tam={64} /> : <Icon n={it.tipo === 'skin' ? 'star' : 'tune'} className="text-primary text-4xl" />}
         </div>
         <div className="min-w-0">
-          <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">{it.tipo === 'operador' ? 'OPERADOR' : it.tipo === 'camo' ? 'CAMUFLAJE' : `ACCESORIO · ${slot ? slot.corto : ''}`}</div>
+          <div className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">{it.tipo === 'operador' ? 'OPERADOR' : it.tipo === 'camo' ? 'CAMUFLAJE' : it.tipo === 'skin' ? 'ASPECTO EVOLUTIVO' : `ACCESORIO · ${slot ? slot.corto : ''}`}</div>
           <div className="font-label-lg text-label-lg text-on-surface uppercase font-bold">{it.n.replace(/"/g, '')}</div>
           {it.rol && <div className="font-label-sm text-label-sm text-primary uppercase">{it.rol}</div>}
         </div>
       </div>
+      {it.colores && <div className="flex flex-col gap-1"><div className="flex gap-0.5">{it.colores.map((c, k) => <span key={k} className="flex-1 h-2 rounded-sm" style={{ background: c }}></span>)}</div><span className="font-label-sm text-label-sm text-on-surface-variant">{it.desc} Crece con tus bajas (5 fases).</span></div>}
       {it.perks && <div className="flex flex-col gap-0.5">{it.perks.map(k => <span key={k.t} className={`font-label-sm text-label-sm ${k.malo ? 'text-error' : 'text-secondary'}`}>{k.malo ? '−' : '+'} {k.t}</span>)}</div>}
       {it.mods && <div className="flex flex-wrap gap-1">{Object.entries(it.mods).slice(0, 4).map(([k, v]) => <span key={k} className={`font-label-sm text-label-sm px-1.5 py-0.5 rounded ${v > 0 ? 'bg-secondary/10 text-secondary' : 'bg-error/10 text-error'}`}>{k === 'sil' ? 'Silenciado' : `${v > 0 ? '+' : ''}${v} ${k}`}</span>)}</div>}
       <div className="flex items-center justify-between gap-space-sm mt-auto pt-space-xs">
@@ -83,6 +84,7 @@ export default function Mercado({ f }) {
 
       <Seccion titulo="OPERADORES" color="bg-secondary"><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-gutter">{por('operador').map(i => <Producto key={i.id} it={i} p={p} />)}</div></Seccion>
       <Seccion titulo="CAMUFLAJES"><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-gutter">{por('camo').map(i => <Producto key={i.id} it={i} p={p} />)}</div></Seccion>
+      <Seccion titulo="ASPECTOS EVOLUTIVOS" color="bg-primary"><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-gutter">{por('skin').map(i => <Producto key={i.id} it={i} p={p} />)}</div></Seccion>
       <Seccion titulo="ACCESORIOS DE ARMA" color="bg-tertiary"><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-gutter">{por('accesorio').map(i => <Producto key={i.id} it={i} p={p} />)}</div></Seccion>
 
       <Seccion titulo="FICHAS" color="bg-tertiary" chip={<span className="font-label-sm text-label-sm text-on-surface-variant bg-surface-container-highest px-space-xs py-0.5 rounded">{CONFIG.COBRAR ? 'PAGO SEGURO' : 'PRÓXIMAMENTE'}</span>}>

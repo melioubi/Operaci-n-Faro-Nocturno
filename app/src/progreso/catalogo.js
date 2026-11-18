@@ -92,6 +92,29 @@ export const OPERADORES = [
     [{ k: 'xpMul', v: 1.15, t: '+15% de experiencia' }, { k: 'alcMul', v: 1.1, t: '+10% de alcance' }], { c: '#6a3f9a', h: '#44226e' }, { tipo: 'tienda', precio: 90, moneda: 'fichas' }),
   op('leyenda', 'LEYENDA DEL FARO', 'EDICIÓN ÉLITE', 'Sólo para quienes llegaron al final del pase.',
     [{ k: 'danioMul', v: 1.05, t: '+5% de daño' }, { k: 'hpAdd', v: 15, t: '+15 de vida máxima' }, { k: 'regenMul', v: 1.15, t: '+15% regeneración' }], { c: '#d4a830', h: '#a07818' }, { tipo: 'pase', n: 100, premium: true }),
+  op('valkiria', 'VALKIRIA', 'APOYO MÉDICO', 'Cura a su paso: regenera vida muy rápido y aguanta un poco más.',
+    [{ k: 'regenMul', v: 1.4, t: '+40% regeneración de vida' }, { k: 'hpAdd', v: 10, t: '+10 de vida máxima' }], { c: '#8a3a6a', h: '#5a2044' }, { tipo: 'pase', n: 50, premium: true }),
+];
+
+// Datos de la ficha de cada operador (pantalla OPERADORES)
+export const FACCIONES = [{ id: 'faro', n: 'ESCUADRÓN FARO' }, { id: 'sombra', n: 'GRUPO SOMBRA' }];
+export const OP_EXTRA = {
+  faro: { fac: 'faro', hab: { n: 'RESPIRO TÁCTICO', d: 'Si nadie te dispara, tu vida se recupera mucho más rápido.' }, arma: 'FUSIL M4', remate: 'destello', voz: ['Faro al mando. Mantengan la posición.', 'La noche es nuestra. Vamos.'], tono: 0.9 },
+  sombra: { fac: 'sombra', hab: { n: 'OJO TÉRMICO', d: 'Disparos de más alcance: ve y pega antes de que lo vean.' }, arma: 'FUSIL M4', remate: 'rayo', voz: ['Sombra en posición. Un disparo, una baja.', 'Los tengo en la mira.'], tono: 0.7 },
+  viper: { fac: 'sombra', hab: { n: 'ENTRADA RÁPIDA', d: 'Más veloz y recarga en un suspiro: entra primero.' }, arma: 'ESCOPETA', remate: 'brasas', voz: ['Viper, entrando. ¡Muévanse!', 'Rápido y limpio.'], tono: 1.1 },
+  hielo: { fac: 'faro', hab: { n: 'PIEL DE ACERO', d: 'Aguanta muchísimo más castigo, a costa de ir más lento.' }, arma: 'ESCOPETA', remate: 'ceniza', voz: ['Hielo no se mueve. Acérquense.', 'Frío como el acero.'], tono: 0.6 },
+  cobra: { fac: 'sombra', hab: { n: 'CARGA EXTRA', d: 'Empieza con granadas de más para limpiar la zona.' }, arma: 'FUSIL M4', remate: 'brasas', voz: ['Cobra lista. ¡Granada afuera!', 'Que explote todo.'], tono: 0.8 },
+  nova: { fac: 'sombra', hab: { n: 'MENTE TÁCTICA', d: 'Aprende de cada combate: sube de nivel más rápido.' }, arma: 'PISTOLA', remate: 'toxico', voz: ['Nova analizando. Ventaja confirmada.', 'Cada partida es una lección.'], tono: 1.25 },
+  leyenda: { fac: 'faro', hab: { n: 'LEYENDA VIVA', d: 'Un poco de todo: más daño, más vida y mejor recuperación.' }, arma: 'FUSIL M4', remate: 'destello', voz: ['La leyenda del faro ha vuelto.', 'Terminemos lo que empezamos.'], tono: 0.85 },
+  valkiria: { fac: 'faro', hab: { n: 'SUTURA DE CAMPO', d: 'Regenera la vida mucho más rápido y aguanta un poco más.' }, arma: 'PISTOLA', remate: 'rayo', voz: ['Valkiria al rescate. Nadie cae hoy.', 'Aguanten, yo los cubro.'], tono: 1.3 },
+};
+export const REMATES = [
+  { id: 'ninguno', n: 'SIN REMATE', d: 'Sin efecto especial.', nivel: 1 },
+  { id: 'destello', n: 'DESTELLO DORADO', d: 'Chispas doradas al derribar.', nivel: 1 },
+  { id: 'ceniza', n: 'CENIZA FANTASMA', d: 'El enemigo se deshace en ceniza.', nivel: 8 },
+  { id: 'rayo', n: 'DESCARGA ELÉCTRICA', d: 'Un rayo azul al caer.', nivel: 15 },
+  { id: 'brasas', n: 'BRASAS VIVAS', d: 'Una explosión de brasas.', nivel: 25 },
+  { id: 'toxico', n: 'NUBE TÓXICA', d: 'Una nube verde al derribar.', nivel: 35 },
 ];
 const cam = (id, n, c, h, fuente) => ({ tipo: 'camo', id, n, c, h, fuente });
 export const CAMOS = [
@@ -108,8 +131,23 @@ export const CAMOS = [
   cam('faronoct', 'FARO NOCTURNO', '#e0a030', '#2a1a2e', { tipo: 'pase', n: 60, premium: true }),
   cam('dorado', 'DORADO', '#d4a830', '#a07818', { tipo: 'pase', n: 80, premium: true }),
 ];
+// ---------- Aspectos de arma EVOLUTIVOS (estilo Free Fire): crecen con tus bajas ----------
+export const EVO_UMBRALES = [0, 30, 100, 250, 500];          // bajas para llegar a cada fase (I a V)
+export const EVO_FASES = ['I', 'II', 'III', 'IV', 'V'];
+export const evoNivel = b => { let n = 1; EVO_UMBRALES.forEach((u, i) => { if (b >= u) n = i + 1; }); return n; };
+const skin = (id, n, arma, fuente, colores, acento, desc) => ({ tipo: 'skin', id, n, arma, fuente, colores, acento, desc });
+export const SKINS = [
+  skin('sk_neon', 'PULSO NEÓN', 0, { tipo: 'pase', n: 15 }, ['#2a3a40', '#1f6a6a', '#1aa5a0', '#20d8c0', '#80fff0'], '#40ffd0', 'La pistola se ilumina fase a fase.'),
+  skin('sk_alba', 'ALBA DE ÁMBAR', 1, { tipo: 'pase', n: 8 }, ['#6b5a3a', '#8a6d2a', '#b8872a', '#e0a030', '#ffd060'], '#ffcf70', 'Del bronce al oro: cada fase suma brillo.'),
+  skin('sk_ascua', 'ASCUA VIVA', 2, { tipo: 'pase', n: 24 }, ['#5a3a2a', '#8a3a1a', '#c0481a', '#ff6a20', '#ffb040'], '#ff7a30', 'La escopeta arde cada vez más.'),
+  skin('sk_cobalto', 'COBALTO', 1, { tipo: 'tienda', precio: 1200, moneda: 'creditos' }, ['#3a4a6a', '#3a60a0', '#4080d0', '#60a0ff', '#a0d0ff'], '#5aa0ff', 'Azul profundo que se vuelve eléctrico.'),
+  skin('sk_hielo', 'CUERVO ÁRTICO', 1, { tipo: 'pase', n: 40, premium: true }, ['#5a6a7a', '#7a9ab0', '#a0c8e0', '#c8ecff', '#ffffff'], '#80e0ff', 'Escarcha que crece con cada baja.'),
+  skin('sk_toxica', 'VÍBORA TÓXICA', 2, { tipo: 'pase', n: 70, premium: true }, ['#3a4a2a', '#4a7a2a', '#60b030', '#80e040', '#c0ff70'], '#80ff40', 'Veneno brillante en la escopeta.'),
+  skin('sk_dragon', 'DRAGÓN DEL FARO', 1, { tipo: 'pase', n: 90, premium: true }, ['#4a2a2a', '#8a2020', '#c02020', '#ff4030', '#ffa060'], '#ff4040', 'La skin definitiva: escamas de fuego.'),
+  skin('sk_oro', 'FUSIL DORADO', 1, { tipo: 'tienda', precio: 120, moneda: 'fichas' }, ['#8a7a3a', '#b8a030', '#e0c030', '#ffd740', '#fff0a0'], '#ffe060', 'Oro macizo. Brilla más con cada fase.'),
+];
 export const ITEMS = {};
-[...OPERADORES, ...CAMOS, ...ACCESORIOS].forEach(i => { ITEMS[i.id] = i; });
+[...OPERADORES, ...CAMOS, ...ACCESORIOS, ...SKINS].forEach(i => { ITEMS[i.id] = i; });
 export const OPERADOR_POR_ID = id => ITEMS[id] && ITEMS[id].tipo === 'operador' ? ITEMS[id] : OPERADORES[0];
 export const CAMO_POR_ID = id => ITEMS[id] && ITEMS[id].tipo === 'camo' ? ITEMS[id] : CAMOS[0];
 export const slotsDe = arma => SLOTS.filter(s => s.armas.includes(arma));
@@ -159,7 +197,7 @@ export function barrasArma(arma, equipado) {
 export const NOMBRE_MOD = { dmg: 'daño', alc: 'alcance', pre: 'precisión', cad: 'cadencia', mov: 'movilidad', ret: 'control de retroceso', carg: 'capacidad del cargador', rec: 'velocidad de recarga', perd: 'perdigones' };
 
 // ---------- Pase de batalla (100 niveles, pista libre y pista premium) ----------
-export const TODOS = [...OPERADORES, ...CAMOS, ...ACCESORIOS];
+export const TODOS = [...OPERADORES, ...CAMOS, ...ACCESORIOS, ...SKINS];
 export function recompensasPase(n) {
   const libre = [], prem = [];
   for (const it of TODOS) {

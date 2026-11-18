@@ -3,6 +3,7 @@ import { Icon, Bruco } from './Icon.jsx';
 import { API, fmt, mmss, pantallaCompleta, puedePantallaCompleta } from './comun.js';
 import { AyudaContenido } from './Paginas.jsx';
 import Hud from './Hud.jsx';
+import { AjustesModal } from './Ajustes.jsx';
 
 // ---------- Marco de las ventanas (pausa, abastecimiento, fin) ----------
 function Ventana({ titulo, chip, color = 'bg-primary', children, ancho = 'max-w-md', cerrar }) {
@@ -27,12 +28,13 @@ const Boton = ({ children, onClick, icono, primario, deshabilitado, className = 
 );
 
 // ---------- Pausa ----------
-function Pausa({ f, abrirAyuda }) {
+function Pausa({ f, abrirAyuda, abrirAjustes }) {
   return (
     <Ventana titulo={f.mp ? 'MENÚ' : 'PAUSA'} chip={<span className="font-label-sm text-label-sm text-primary bg-surface-container-highest px-space-xs py-0.5 rounded">{f.mp ? 'LA PARTIDA SIGUE' : f.modo === 'tiro' ? 'CAMPO DE TIRO' : 'EN ESPERA'}</span>}>
       <div className="flex flex-col gap-space-sm">
         <Boton primario icono="play_arrow" onClick={API.reanudar}>SEGUIR</Boton>
         <Boton icono="help" onClick={abrirAyuda}>CÓMO JUGAR</Boton>
+        <Boton icono="settings" onClick={abrirAjustes}>AJUSTES: VISTA Y MÚSICA</Boton>
         <Boton icono={f.mute ? 'volume_off' : 'volume_up'} onClick={API.toggleSonido}>SONIDO: {f.mute ? 'NO' : 'SÍ'}</Boton>
         {puedePantallaCompleta() && <Boton icono="fullscreen" onClick={pantallaCompleta}>PANTALLA COMPLETA</Boton>}
         <Boton icono="logout" onClick={API.salir}>{f.mp ? 'SALIR DE LA SALA' : f.modo === 'tiro' ? 'VOLVER A LA ARMERÍA' : 'SALIR AL MENÚ'}</Boton>
@@ -139,7 +141,7 @@ function Fin({ f }) {
 }
 
 export default function Juego({ f }) {
-  const [ayuda, setAyuda] = useState(false);
+  const [ayuda, setAyuda] = useState(false), [ajustes, setAjustes] = useState(false);
   if (f.mp && f.cargando) {
     return <div className="absolute inset-0 flex items-center justify-center bg-background"><div className="flex items-center gap-2 font-label-lg text-label-lg text-tertiary"><Icon n="progress_activity" className="animate-spin text-2xl" />CARGANDO PARTIDA...</div></div>;
   }
@@ -147,11 +149,12 @@ export default function Juego({ f }) {
   return (
     <div className="absolute inset-0 pointer-events-none">
       <Hud f={f} />
-      {f.estado === 'pausa' && !ayuda && <Pausa f={f} abrirAyuda={() => setAyuda(true)} />}
-      {f.mp && f.pausaLocal && !fin && !ayuda && <Pausa f={f} abrirAyuda={() => setAyuda(true)} />}
+      {f.estado === 'pausa' && !ayuda && <Pausa f={f} abrirAyuda={() => setAyuda(true)} abrirAjustes={() => setAjustes(true)} />}
+      {f.mp && f.pausaLocal && !fin && !ayuda && <Pausa f={f} abrirAyuda={() => setAyuda(true)} abrirAjustes={() => setAjustes(true)} />}
       {f.estado === 'tienda' && <Abastecimiento f={f} />}
       {fin && f.fin && <Fin f={f} />}
       {ayuda && <AyudaModal cerrar={() => setAyuda(false)} />}
+      {ajustes && <AjustesModal f={f} cerrar={() => setAjustes(false)} />}
     </div>
   );
 }

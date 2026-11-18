@@ -18,7 +18,11 @@ Tu escuadrón llegó a una isla con un faro abandonado y un grupo enemigo tomó 
 - **Modos:** Campaña (4 zonas), Supervivencia (oleadas infinitas), Campo de tiro (para probar armas), Cooperativo con amigos y Duelo por equipos (verde vs rojo). Los modos online usan bots que maneja la compu para completar equipos.
 - **100 niveles** con poca experiencia por nivel, y un **pase de batalla** con pista gratis y pista premium.
 - **Armería:** accesorios para cada arma (boca de cañón, láser, óptica, acople, munición y culata) que cambian de verdad cómo dispara. Se prueban en el campo de tiro, que muestra daño por segundo y puntería.
-- **Operadores:** 7 personajes con habilidades propias (más vida, más velocidad, más daño, más experiencia...) y 12 camuflajes.
+- **Vistas de cámara** (tecla **V** o AJUSTES): desde arriba **2.5D** (paredes y árboles en relieve), **tercera persona** (cámara detrás del soldado), **primera persona** (ves por los ojos del soldado, con el arma en la mano) y la clásica plana. En primera y tercera, el mouse mira (clic para capturarlo, ESC lo suelta); en el celu el joystick derecho gira y dispara.
+- **Música** (AJUSTES): ambiente táctico en el menú, **metal estilo DOOM** en la partida, 8 bits o sin música. Todo se genera por código.
+- **Operadores:** 8 personajes en dos facciones (Escuadrón Faro y Grupo Sombra) con ficha tipo Warzone: estadísticas, habilidad de campo, arma favorita, remate (efecto al derribar), voz y retrato que se gira 360°. Más 12 camuflajes.
+- **Aspectos de arma evolutivos** (estilo Free Fire): crecen en 5 fases con tus bajas (ámbar, ártico, dragón…). Se ganan en el pase o en la tienda y se equipan en la ARMERÍA; cambian el color del arma y de las balas.
+- **Pase de batalla como mapa de sectores:** 20 sectores de 5 niveles cada uno (A01–A20), con el detalle de recompensas gratis y premium de cada sector.
 - **Tienda:** créditos (se ganan jugando) y fichas (moneda premium). Operadores, camuflajes y accesorios.
 - **Campo de batalla** con HUD táctico: radar circular, brújula con el objetivo, registro de bajas, escuadrón, arma con contador de balas, lluvia, relámpagos y visión nocturna (tecla N).
 - **Salas online:** se crea una sala, se manda el link y los amigos entran. Conexión directa entre navegadores (WebRTC con PeerJS), sin servidor propio.
@@ -55,7 +59,7 @@ Por ahora el juego vive sólo en este repositorio (GitHub Pages) y guarda el pro
 | Progresión (niveles, catálogo, perfil, pase) | `app/src/progreso/` |
 | Compilación | Vite |
 | Multijugador | PeerJS (WebRTC) |
-| Sonido | Web Audio (chiptune generado por código, sin archivos) |
+| Sonido y música | Web Audio (efectos y música generados por código, sin archivos) |
 | App instalable | `manifest.webmanifest` + `sw.js` |
 
 **¿Por qué Vite + React y no Next.js?** El juego corre 100% en el navegador (usa canvas, teclado y toques) y GitHub Pages sólo sirve archivos. Next.js agrega un servidor y renderizado en el servidor que acá no hacen falta. Vite + React da los mismos componentes y estilos, compila más rápido y se publica como archivos simples.

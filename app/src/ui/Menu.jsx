@@ -9,6 +9,7 @@ import Armeria from './Armeria.jsx';
 import Operadores from './Operadores.jsx';
 import Pase from './Pase.jsx';
 import Mercado from './Mercado.jsx';
+import { AjustesModal } from './Ajustes.jsx';
 
 const TABS = [
   { id: 'jugar', t: 'JUGAR' }, { id: 'armeria', t: 'ARMERÍA / GUNSMITH' }, { id: 'operadores', t: 'OPERADORES' }, { id: 'pase', t: 'PASE DE BATALLA' },
@@ -23,6 +24,7 @@ function Reloj() {
 
 function Cabecera({ f, tab, irA }) {
   const p = usePerfil();
+  const [ajustes, setAjustes] = useState(false);
   return (
     <header className="shrink-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
       <div className="w-full px-gutter flex flex-col gap-space-xs pt-space-xs pb-space-sm short:pb-space-xs">
@@ -69,6 +71,7 @@ function Cabecera({ f, tab, irA }) {
                 <span className="text-outline">|</span>
                 <span className="text-secondary font-label-md text-label-md">{fmt(p.fichas)} FICHAS</span>
               </div>
+              <button onClick={() => { API.click(); setAjustes(true); }} aria-label="Ajustes" title="Ajustes: vista y música" className="w-8 h-8 rounded-full bg-surface-container-high hover:bg-surface-container-highest flex items-center justify-center text-primary"><Icon n="settings" className="text-[18px]" /></button>
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                 <Icon n="person" className="text-on-primary text-[18px]" />
               </div>
@@ -95,6 +98,7 @@ function Cabecera({ f, tab, irA }) {
           </div>
         </div>
       </div>
+      {ajustes && <AjustesModal f={f} cerrar={() => setAjustes(false)} />}
     </header>
   );
 }
