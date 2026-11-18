@@ -15,11 +15,36 @@ Tu escuadrón llegó a una isla con un faro abandonado y un grupo enemigo tomó 
 
 ## ✨ Qué tiene
 
-- **Modos:** Campaña (4 zonas), Supervivencia (oleadas infinitas), Cooperativo con amigos y Duelo por equipos (verde vs rojo). Los modos online usan bots que maneja la compu para completar equipos.
-- **Niveles y camuflajes:** la experiencia se guarda en cada dispositivo. Del nivel 1 al 10, con mejoras de vida, armas y camuflajes.
-- **Tienda** entre zonas, rachas de bajas (dron, ataque aéreo, torreta), perros y francotiradores.
+- **Modos:** Campaña (4 zonas), Supervivencia (oleadas infinitas), Campo de tiro (para probar armas), Cooperativo con amigos y Duelo por equipos (verde vs rojo). Los modos online usan bots que maneja la compu para completar equipos.
+- **100 niveles** con poca experiencia por nivel, y un **pase de batalla** con pista gratis y pista premium.
+- **Armería:** accesorios para cada arma (boca de cañón, láser, óptica, acople, munición y culata) que cambian de verdad cómo dispara. Se prueban en el campo de tiro, que muestra daño por segundo y puntería.
+- **Operadores:** 7 personajes con habilidades propias (más vida, más velocidad, más daño, más experiencia...) y 12 camuflajes.
+- **Tienda:** créditos (se ganan jugando) y fichas (moneda premium). Operadores, camuflajes y accesorios.
+- **Campo de batalla** con HUD táctico: radar circular, brújula con el objetivo, registro de bajas, escuadrón, arma con contador de balas, lluvia, relámpagos y visión nocturna (tecla N).
 - **Salas online:** se crea una sala, se manda el link y los amigos entran. Conexión directa entre navegadores (WebRTC con PeerJS), sin servidor propio.
-- **Menús y HUD** con estética táctica: pestañas Jugar, Armería, Operadores, Niveles, Historial y Ayuda.
+- **App instalable** (celular y compu) y funciona sin internet en el modo solo.
+
+## 💰 Cobros (más adelante)
+
+Todo se prueba gratis por ahora. En `app/src/progreso/catalogo.js` hay un interruptor:
+
+```js
+export const CONFIG = { COBRAR: false, ... }
+```
+
+- Los productos con **fichas** son los premium (por ejemplo el operador NOVA, el camuflaje NEÓN y el pase premium).
+- Mientras `COBRAR` sea `false`, la tienda ofrece un **regalo de prueba de fichas** y las compras con dinero real aparecen como "PRÓXIMAMENTE".
+- **Todavía no hay ningún cobro real conectado.** Cuando el juego esté listo se va a conectar un medio de pago, se pone `COBRAR: true` y se saca el regalo de prueba.
+
+## ☁️ Cuando esté terminado: GCP y Supabase
+
+Por ahora el juego vive sólo en este repositorio (GitHub Pages) y guarda el progreso en cada navegador. Está preparado para dar el salto:
+
+- **Progreso del jugador:** todo pasa por `app/src/progreso/almacen.js` (leer y guardar el perfil). Para usar Supabase se reemplaza ese archivo por uno que guarde en una tabla de perfiles, y el resto del juego no cambia.
+- **Cuentas:** Supabase Auth (correo o Google) para que el avance siga al jugador entre dispositivos.
+- **Compras y fichas:** se validan del lado del servidor (una función en GCP, por ejemplo Cloud Run) para que nadie se regale fichas desde el navegador.
+- **Multijugador:** hoy es directo entre navegadores. Si crece, se puede mover a un servidor de salas en GCP.
+- Nada de esto está desplegado todavía.
 
 ## 🧰 Cómo está hecho
 
@@ -27,6 +52,7 @@ Tu escuadrón llegó a una isla con un faro abandonado y un grupo enemigo tomó 
 |---|---|
 | Mundo del juego (mapa, enemigos, disparos, luces) | Canvas 2D, en `app/src/engine/juego.js` |
 | Interfaz (menús, HUD, tienda, pausa) | React + Tailwind CSS, en `app/src/ui/` |
+| Progresión (niveles, catálogo, perfil, pase) | `app/src/progreso/` |
 | Compilación | Vite |
 | Multijugador | PeerJS (WebRTC) |
 | Sonido | Web Audio (chiptune generado por código, sin archivos) |

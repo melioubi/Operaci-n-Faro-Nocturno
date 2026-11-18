@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { store, API, DATOS } from '../engine/juego.js';
+import { perfil, suscribirPerfil, versionPerfil } from '../progreso/perfil.js';
 
 export { API, DATOS };
 
@@ -48,3 +49,11 @@ export async function pantallaCompleta() {
     try { await screen.orientation.lock('landscape'); } catch (e) { /* no todos los navegadores lo permiten */ }
   } catch (e) { aviso('Este navegador no permite pantalla completa'); }
 }
+
+// El perfil (experiencia, monedas, desbloqueos, equipo). Se vuelve a dibujar cuando cambia.
+export const usePerfil = () => { useSyncExternalStore(suscribirPerfil, versionPerfil); return perfil; };
+
+// Pestaña con la que se abre el menú (por ejemplo, al volver del campo de tiro vuelve a la armería)
+let pestanaInicial = 'jugar';
+export const setPestanaInicial = t => { pestanaInicial = t; };
+export const tomarPestanaInicial = () => { const t = pestanaInicial; pestanaInicial = 'jugar'; return t; };

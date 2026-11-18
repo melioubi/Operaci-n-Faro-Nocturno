@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Icon } from './Icon.jsx';
-import { API, DATOS, compartirLink, copiarLink, fmt } from './comun.js';
+import { API, DATOS, compartirLink, copiarLink, fmt, usePerfil } from './comun.js';
+import { ARMAS_BASE, CAMO_POR_ID, OPERADOR_POR_ID, SLOTS, recompensasPase } from '../progreso/catalogo.js';
+import { accesoriosEquipados, camoActivo, opActivo, pendientesPase } from '../progreso/perfil.js';
+import { describir } from './Pase.jsx';
 import { IMG_MODO, IMG_OPERADOR, MODOS } from './datos.js';
 
 function Etiqueta({ color = 'bg-primary', texto, chip, chipClase = 'text-primary-fixed-dim bg-surface-container-highest' }) {
@@ -35,7 +38,7 @@ export function NombreEditable({ nombre }) {
 }
 
 function Miembro({ s, yo, f, esHost, modoEquipos }) {
-  const camo = DATOS.CAMOS[s.camo || 0];
+  const camo = CAMO_POR_ID(s.camo);
   return (
     <div className={`relative p-space-sm rounded flex items-center justify-between gap-space-sm transition-colors ${yo ? 'bg-surface-container shadow-sm' : 'bg-surface-container-low hover:bg-surface-container'}`}>
       <div className="flex items-center gap-space-sm min-w-0">
@@ -143,9 +146,11 @@ function Escuadron({ f, modo, m }) {
   );
 }
 
-function Progreso({ f }) {
+function Progreso({ f, irA }) {
+  usePerfil();
   const sig = f.xpSig, pct = sig ? Math.min(100, Math.round(100 * (f.xp - f.xpIni) / (sig - f.xpIni))) : 100;
-  const premio = DATOS.PREMIOS[f.nivel + 1];
+  const premio = f.nivel < 100 ? recompensasPase(f.nivel + 1).libre.map(r => describir(r).titulo).join(' + ').toUpperCase() : null;
+  const pend = pendientesPase();
   return (
     <div className="bg-surface-container-low rounded-lg p-space-md shadow-md flex flex-col gap-space-sm">
       <div className="flex items-center justify-between">
@@ -153,7 +158,7 @@ function Progreso({ f }) {
         <span className="font-label-sm text-label-sm text-on-surface-variant">NIVEL {f.nivel}{sig ? ` → ${f.nivel + 1}` : ' (MÁX)'}</span>
       </div>
       <div>
-        <h3 className="font-label-lg text-label-lg text-on-surface uppercase font-bold">{sig ? `SUBÍ DE RANGO: ${DATOS.RANGOS[f.nivel]}` : 'RANGO MÁXIMO: LEYENDA DEL FARO'}</h3>
+        <h3 className="font-label-lg text-label-lg text-on-surface uppercase font-bold">{sig ? `PRÓXIMO NIVEL: ${f.nivel + 1} DE 100` : 'RANGO MÁXIMO: LEYENDA DEL FARO'}</h3>
         <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Cada baja suma experiencia. Se guarda en este dispositivo, también cuando jugás con amigos.</p>
       </div>
       <div className="flex flex-col gap-1 mt-space-xs">
@@ -165,6 +170,7 @@ function Progreso({ f }) {
           <div className="h-full bg-primary rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(255,193,116,0.5)]" style={{ width: pct + '%' }}></div>
         </div>
       </div>
+      {pend > 0 && <button onClick={() => irA('pase')} className="px-space-sm py-1.5 bg-primary/15 ring-1 ring-primary text-primary rounded font-label-md text-label-md uppercase tracking-wider flex items-center justify-center gap-1.5 animate-pulse"><Icon n="redeem" className="text-base" />TENÉS {pend} RECOMPENSAS PARA RECLAMAR</button>}
       {premio && (
         <div className="flex items-center justify-between pt-space-xs bg-surface-container px-space-sm py-1.5 rounded gap-space-sm">
           <div className="flex items-center gap-space-xs min-w-0">
@@ -181,8 +187,9 @@ function Progreso({ f }) {
 export default function Lobby({ f, modo, setModo, irA }) {
   const m = MODOS.find(o => o.id === modo);
   const red = f.red, enSala = red.activo, esHost = red.host, esCliente = red.cliente;
-  const camo = DATOS.CAMOS[f.perfil.camo];
-  const arma = DATOS.ARMAS[1];
+  usePerfil();
+  const camo = CAMO_POR_ID(camoActivo()), op = OPERADOR_POR_ID(opActivo()), arma = ARMAS_BASE[1];
+  const nAcc = Object.keys(accesoriosEquipados(1)).length, nSlots = SLOTS.filter(s => s.armas.includes(1)).length;
 
   const elegir = id => {
     if (esCliente) return;
@@ -193,7 +200,7 @@ export default function Lobby({ f, modo, setModo, irA }) {
 
   // Botón principal (cambia según el modo y el estado de la sala)
   let titulo, sub, deshabilitado = false, esperando = false;
-  if (!m.online) { titulo = 'DESPLEGAR ESCUADRA'; sub = enSala ? '[ACT-01] SALDRÁS DE LA SALA' : '[ACT-01] INICIAR OPERACIÓN'; }
+  if (!m.online) { titulo = modo === 'tiro' ? 'IR AL CAMPO DE TIRO' : 'DESPLEGAR ESCUADRA'; sub = enSala ? '[ACT-01] SALDRÁS DE LA SALA' : '[ACT-01] INICIAR OPERACIÓN'; }
   else if (!enSala) { titulo = 'INVITAR Y CREAR SALA'; sub = '[ACT-02] ABRIR SALA ONLINE'; }
   else if (red.estado === 'error') { titulo = 'SIN CONEXIÓN'; sub = red.error; deshabilitado = true; }
   else if (red.estado !== 'listo') { titulo = 'ABRIENDO SALA...'; sub = '[IFF-PING] CONECTANDO'; deshabilitado = true; esperando = true; }
@@ -202,7 +209,7 @@ export default function Lobby({ f, modo, setModo, irA }) {
 
   const desplegar = () => {
     API.audio();
-    if (!m.online) { if (modo === 'campania') API.jugarCampania(); else API.jugarSupervivencia(); return; }
+    if (!m.online) { if (modo === 'campania') API.jugarCampania(); else if (modo === 'tiro') API.jugarTiro(); else API.jugarSupervivencia(); return; }
     if (!enSala) { API.crearSala(); API.setModoSala(modo); return; }
     if (esHost) { if (red.salaModo !== modo) API.setModoSala(modo); API.empezar(); }
   };
@@ -352,7 +359,7 @@ export default function Lobby({ f, modo, setModo, irA }) {
                 <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface tracking-wider uppercase mt-1 leading-none flex items-center gap-2 flex-wrap">
                   <span>{f.rango.split(' ')[0].slice(0, 4)}.</span><NombreEditable nombre={f.perfil.nombre} />
                 </h1>
-                <div className="font-label-sm text-label-sm text-on-surface-variant mt-1">UNIDAD OPERATIVA: ESCUADRÓN FARO // DIVISIÓN COSTERA</div>
+                <div className="font-label-sm text-label-sm text-on-surface-variant mt-1">{op.rol} // ESCUADRÓN FARO</div>
               </div>
               <div className="flex flex-col items-center justify-center bg-surface-container px-space-sm py-1.5 rounded shrink-0">
                 <Icon n="shield" className="text-primary text-2xl" />
@@ -365,7 +372,7 @@ export default function Lobby({ f, modo, setModo, irA }) {
                 <Icon n="military_tech" className="text-primary text-base" />
                 <div className="flex flex-col min-w-0">
                   <span className="font-label-md text-label-md text-on-surface leading-none uppercase font-bold truncate">{arma.nombre} // FARO NOCTURNO</span>
-                  <span className="font-label-sm text-label-sm text-on-surface-variant">{Math.min(5, Math.floor(f.nivel / 2) + 1)}/5 MEJORAS DESBLOQUEADAS</span>
+                  <span className="font-label-sm text-label-sm text-on-surface-variant">{nAcc}/{nSlots} ACCESORIOS MONTADOS</span>
                 </div>
               </div>
               <button onClick={() => irA('armeria')} className="font-label-sm text-label-sm text-primary hover:text-primary-fixed uppercase tracking-wider flex items-center gap-0.5 shrink-0"><span>MODIFICAR</span><Icon n="arrow_forward" className="text-xs" /></button>
@@ -376,7 +383,7 @@ export default function Lobby({ f, modo, setModo, irA }) {
         {/* DERECHA: escuadrón y directiva */}
         <div className="col-span-12 sm:col-span-5 lg:col-span-4 order-2 lg:order-3 flex flex-col justify-between gap-space-md z-20">
           <Escuadron f={f} modo={modo} m={m} />
-          <Progreso f={f} />
+          <Progreso f={f} irA={irA} />
         </div>
       </div>
     </>

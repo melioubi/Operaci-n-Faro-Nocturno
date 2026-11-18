@@ -1,6 +1,7 @@
 // Imágenes del diseño (se cargan de internet; si no hay conexión el fondo oscuro queda igual de bien)
 export const IMG_FONDO = 'https://lh3.googleusercontent.com/aida-public/AB6AXuDYJBS7Ep1eLUFLgllpsKpPaBuIO0hc6m6VTiYsN5HfAy11t-thJDZVumfWCgZH7Apc8shf-Li9UZi6LW9K1WbY3sbOnNDUEeulDYNHeA14MSgra5x2MEkRb5492u_9h7AVSIrTmocokvsmDZcsFX1LEwpvbzJl2wFbcC_krnmx8vi9fIzac7vzHTaAKruTAyH7Rj66nuHuHROCI8LVt9F38GNZzKFZZirOhWckb-I';
 export const IMG_MODO = 'https://lh3.googleusercontent.com/aida-public/AB6AXuAuO-DeMJqpS51xCzsI_9LOZ3xZU9gVX8Xbleq58jRkLAJ0MfHyFxd-xm_dntMVzB4Iy2odkPZPdkGMlWH8MRkcMgHG_8QODwYC9FVriPpaubhJy0flcXoiyeQ1Exb9SpcLNFS_yx_z37M8NxzXzChLjTx6Ju5YOZt0KzR9hl5CGvCP2J7fVPW1DJvmLk2vCV6wSQsur8R7fzHNVLlnqL9qYvF6VYLihlk2uLKHeLE';
+export const IMG_FUSIL = 'https://lh3.googleusercontent.com/aida-public/AB6AXuBh4rsrsQgeQKjEi11KS_CU8WzWeUfL3QPS8VQvBCF4-enaH3T9v0dn7pCObmyd9JxCjH3LzsJMpC7T8hE6X6E-wn1-SKNF7HOJrkrgVSeYLgHbKNeR5Rx15oNo92Ol_X86T7JmjkriaDVb-XofMwdt-jSytkkUH6p1oY4Wxte5Ei5zaMm-GSBhhJZ4USyQRzMKVmcqzezWLJBek29UYKKNIHKIRibBA7IPEigleCo';
 export const IMG_OPERADOR = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCiw7tXPC6JRamp4ftWyvFcFNEwIGj5VknSmGn_1lcyMOt0An8DXIDEm7ih_pXofiMxidl6sJDz0hc5bdxLG-y3bJhMrC-PzJkV8-Z3YTP4--dErIOvXTPgEVfWIfzUDshNOCjNk1lJosZIPtk0qutNBgby5AwFE8ttDWzbXsRSReQT27iO_O3jY6fmkB3XS5tQae1gfZAaEsoHh74-PVbYHCVQNlcAhMno8o1TipM';
 
 export const MODOS = [
@@ -12,6 +13,10 @@ export const MODOS = [
     chip: 'RÉCORD DE OLEADAS', jugadores: '1 JUGADOR', online: false,
     desc: 'Una oleada tras otra, cada vez más fuertes. Cada 3 oleadas se abre la tienda del escuadrón. ¿Cuántas aguantás?',
     pie: ['OLEADAS INFINITAS', 'COMANDANTE CADA 5 OLEADAS'] },
+  { id: 'tiro', corto: 'CAMPO DE TIRO', sub: 'Sin enemigos // Probá tus accesorios', etiqueta: 'ENTRENAMIENTO // ARMERÍA', titulo: 'CAMPO DE TIRO',
+    chip: 'PRUEBA TUS ARMAS', jugadores: '1 JUGADOR', online: false,
+    desc: 'Blancos que reaparecen y munición infinita. Ideal para probar accesorios y ver cuánto daño hacés por segundo.',
+    pie: ['SIN ENEMIGOS', 'MUNICIÓN INFINITA'] },
   { id: 'coop', corto: 'COOPERATIVO (CON AMIGOS)', sub: 'Hasta 8 operadores // Bots opcionales', etiqueta: 'MODO ONLINE // COOPERATIVO', titulo: 'DEFENSA DEL FARO',
     chip: 'ONLINE', jugadores: 'HASTA 8 JUGADORES', online: true,
     desc: 'Invitá a tus amigos con un link y defiendan el faro juntos contra oleadas infinitas. Si alguien cae, vuelve a los pocos segundos.',
@@ -50,10 +55,13 @@ export const AYUDA = [
     'Perros: rápidos y en grupo. Francotiradores: láser largo, ¡escondete!',
   ] },
   { t: 'NIVELES Y TIENDA', i: 'military_tech', filas: [
-    'Cada baja da experiencia (XP). Con XP subís de nivel (hasta el 10).',
-    'Cada nivel desbloquea algo: más vida, mejores armas y camuflajes.',
-    'Al despejar una zona se abre la TIENDA: gastá tus puntos en munición y mejoras.',
-    'Tu nivel y tus camuflajes se guardan en este dispositivo.',
+    'Cada baja da experiencia (XP). Con XP subís de nivel, hasta el 100.',
+    'Cada nivel te da una recompensa en el PASE DE BATALLA: reclamala ahí.',
+    'Al terminar una partida ganás CRÉDITOS: gastalos en la TIENDA (operadores, camuflajes y accesorios).',
+    'En la ARMERÍA equipás accesorios que cambian cómo dispara cada arma. Probalos en el CAMPO DE TIRO.',
+    'Cada OPERADOR tiene habilidades propias. Elegí el que más te guste.',
+    'Al despejar una zona se abre el ABASTECIMIENTO: gastá los puntos de la partida en munición.',
+    'Todo se guarda en este dispositivo.',
   ] },
   { t: 'JUGAR CON AMIGOS', i: 'groups', filas: [
     'Elegí COOPERATIVO o DUELO POR EQUIPOS y tocá INVITAR: se crea una sala con un código.',

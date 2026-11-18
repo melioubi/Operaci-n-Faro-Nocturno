@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon, Bruco } from './Icon.jsx';
-import { API, fmt, pantallaCompleta, puedePantallaCompleta } from './comun.js';
+import { API, fmt, pantallaCompleta, puedePantallaCompleta, tomarPestanaInicial, usePerfil } from './comun.js';
 import { instalar, useInstalable } from './pwa.js';
 import { IMG_FONDO, MODOS } from './datos.js';
 import Lobby from './Lobby.jsx';
-import { Armeria, Operadores, Niveles, Historial, Ayuda } from './Paginas.jsx';
+import { Historial, Ayuda } from './Paginas.jsx';
+import Armeria from './Armeria.jsx';
+import Operadores from './Operadores.jsx';
+import Pase from './Pase.jsx';
+import Mercado from './Mercado.jsx';
 
 const TABS = [
-  { id: 'jugar', t: 'JUGAR' }, { id: 'armeria', t: 'ARMERÍA' }, { id: 'operadores', t: 'OPERADORES' },
-  { id: 'niveles', t: 'NIVELES' }, { id: 'historial', t: 'HISTORIAL' }, { id: 'ayuda', t: 'AYUDA' },
+  { id: 'jugar', t: 'JUGAR' }, { id: 'armeria', t: 'ARMERÍA / GUNSMITH' }, { id: 'operadores', t: 'OPERADORES' }, { id: 'pase', t: 'PASE DE BATALLA' },
+  { id: 'historial', t: 'BARRACAS / HISTORIAL' }, { id: 'tienda', t: 'TIENDA' }, { id: 'ayuda', t: 'AYUDA' },
 ];
 
 function Reloj() {
@@ -18,6 +22,7 @@ function Reloj() {
 }
 
 function Cabecera({ f, tab, irA }) {
+  const p = usePerfil();
   return (
     <header className="shrink-0 z-50 bg-surface-container-lowest/90 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
       <div className="w-full px-gutter flex flex-col gap-space-xs pt-space-xs pb-space-sm short:pb-space-xs">
@@ -60,9 +65,9 @@ function Cabecera({ f, tab, irA }) {
             </div>
             <div className="flex items-center gap-space-sm pl-space-sm">
               <div className="flex items-center gap-1.5 bg-surface-container px-space-sm py-1 rounded whitespace-nowrap">
-                <span className="text-primary font-label-md text-label-md">{fmt(f.xp)} XP</span>
+                <span className="text-primary font-label-md text-label-md">{fmt(p.creditos)} CP</span>
                 <span className="text-outline">|</span>
-                <span className="text-secondary font-label-md text-label-md">NV {f.nivel}</span>
+                <span className="text-secondary font-label-md text-label-md">{fmt(p.fichas)} FICHAS</span>
               </div>
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                 <Icon n="person" className="text-on-primary text-[18px]" />
@@ -84,7 +89,7 @@ function Cabecera({ f, tab, irA }) {
           <div className="hidden sm:flex items-center gap-space-sm bg-surface-container-high px-space-md py-1 rounded shrink-0">
             <Icon n="military_tech" className="text-primary text-base" />
             <div className="flex flex-col text-right">
-              <span className="font-label-lg text-label-lg text-primary leading-none">NIVEL {f.nivel}</span>
+              <span className="font-label-lg text-label-lg text-primary leading-none">NIVEL {f.nivel} / 100</span>
               <span className="font-label-sm text-label-sm text-on-surface-variant tracking-wider leading-none mt-0.5">{f.rango}</span>
             </div>
           </div>
@@ -121,7 +126,7 @@ function Pie({ f }) {
 }
 
 export default function Menu({ f }) {
-  const [tab, setTab] = useState('jugar');
+  const [tab, setTab] = useState(tomarPestanaInicial);
   const [modo, setModo] = useState(f.red.activo && f.red.salaModo ? f.red.salaModo : 'campania');
   const refModo = useRef(modo); refModo.current = modo;
   const refF = useRef(f); refF.current = f;
@@ -157,10 +162,11 @@ export default function Menu({ f }) {
         </div>
         <div className="relative z-10 w-full px-gutter md:px-gutter-desktop py-space-md short:py-space-xs flex flex-col justify-between min-h-full">
           {tab === 'jugar' && <Lobby f={f} modo={modo} setModo={setModo} irA={setTab} />}
-          {tab === 'armeria' && <Armeria f={f} />}
-          {tab === 'operadores' && <Operadores f={f} />}
-          {tab === 'niveles' && <Niveles f={f} />}
+          {tab === 'armeria' && <Armeria f={f} irA={setTab} />}
+          {tab === 'operadores' && <Operadores f={f} irA={setTab} />}
+          {tab === 'pase' && <Pase f={f} />}
           {tab === 'historial' && <Historial f={f} />}
+          {tab === 'tienda' && <Mercado f={f} />}
           {tab === 'ayuda' && <Ayuda />}
           <div className="w-full flex flex-wrap items-center justify-between gap-space-sm pt-space-md text-on-surface-variant font-label-sm text-label-sm">
             <div className="flex items-center gap-space-md flex-wrap">

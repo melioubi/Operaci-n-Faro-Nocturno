@@ -5,6 +5,12 @@ import '@fontsource/chivo/latin-900.css';
 import '@fontsource/hanken-grotesk/latin-400.css';
 import '@fontsource/hanken-grotesk/latin-500.css';
 import '@fontsource/hanken-grotesk/latin-700.css';
+import '@fontsource/rajdhani/latin-500.css';
+import '@fontsource/rajdhani/latin-600.css';
+import '@fontsource/rajdhani/latin-700.css';
+import '@fontsource/chivo-mono/latin-400.css';
+import '@fontsource/chivo-mono/latin-600.css';
+import '@fontsource/chivo-mono/latin-800.css';
 import './index.css';
 import { createRoot } from 'react-dom/client';
 import './engine/juego.js';            // arranca el motor del juego (Canvas 2D)

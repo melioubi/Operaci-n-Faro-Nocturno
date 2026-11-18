@@ -1,3 +1,5 @@
+import { ARMAS_BASE as ARMAS, CAMOS, NIVEL_MAX, RANGOS, rangoDe, xpTotal, nivelDeXp, statsArma, perksDe, CAMO_POR_ID, OPERADOR_POR_ID } from '../progreso/catalogo.js';
+import { perfil as PERFIL, equipoLocal, camoActivo, opActivo, ganarXp as ganarXpPerfil, darCreditos, sumarStat, sumarMaestria, suscribirPerfil, nivelPerfil } from '../progreso/perfil.js';
 'use strict';
 /* =====================================================================
    OPERACIÓN FARO NOCTURNO
@@ -34,20 +36,14 @@ const PAD = { x: 3360, y: 600 };         // helipuerto (punto de extracción)
 const FARO = { x: 3152, y: 272 };        // centro de la torre
 const DEFENSA_SEG = 60;
 
-// Armas (estilo COD)
-const ARMAS = [
-  { nombre: 'PISTOLA',  dmg: 20, cadencia: 0.26, cargador: 12, recarga: 0.9, disp: 0.03, vel: 430, perdigones: 1, vida: 0.9,  sfx: 'pistola',  retro: 1 },
-  { nombre: 'FUSIL M4', dmg: 17, cadencia: 0.095, cargador: 30, recarga: 1.4, disp: 0.06, vel: 470, perdigones: 1, vida: 0.9, sfx: 'fusil',    retro: 1.5 },
-  { nombre: 'ESCOPETA', dmg: 13, cadencia: 0.7, cargador: 6,  recarga: 1.8, disp: 0.32, vel: 400, perdigones: 7, vida: 0.32, sfx: 'escopeta', retro: 4 },
-];
-
 // Tipos de enemigos
 const TIPOS = {
   soldado:  { r: 6,  hp: 40,  vel: 52,  cuerpo: '#7a2a2a', casco: '#4a1616', rango: 170, cad: [1.1, 1.8], dmg: 7, perd: 1, disp: 0.09, vbala: 230, pts: 100, arma: 8 },
   corredor: { r: 5,  hp: 26,  vel: 100, cuerpo: '#a0522d', casco: '#5c2a12', melee: 14, pts: 75, arma: 3 },
   pesado:   { r: 8,  hp: 130, vel: 36,  cuerpo: '#4a4a52', casco: '#6a1a1a', rango: 110, cad: [1.4, 2.0], dmg: 6, perd: 4, disp: 0.3, vbala: 210, pts: 200, arma: 9 },
   francotirador: { r: 6, hp: 35, vel: 38, cuerpo: '#3a4a2a', casco: '#2a3018', rango: 320, cad: [2.6, 3.6], dmg: 22, perd: 1, disp: 0.02, vbala: 460, pts: 150, arma: 14, sniper: true },
-  perro:    { r: 4,  hp: 18,  vel: 135, cuerpo: '#6a4a2a', casco: '#4a3018', melee: 9, pts: 60, arma: 0, perro: true },
+  perro:    { r: 4,  hp: 14,  vel: 78,  cuerpo: '#6a4a2a', casco: '#4a3018', melee: 6, pts: 50, arma: 0, perro: true },   // más lento y débil que antes
+  maniqui:  { r: 7,  hp: 220, vel: 0,   cuerpo: '#6a6a72', casco: '#8a8a92', pts: 0, arma: 0, estatico: true },            // blanco del campo de tiro
   jefe:     { r: 10, hp: 700, vel: 40,  cuerpo: '#2a1a2e', casco: '#8a1010', rango: 160, cad: [0.6, 0.9], dmg: 8, perd: 3, disp: 0.15, vbala: 250, pts: 1500, arma: 11, jefe: true },
 };
 
@@ -360,38 +356,29 @@ let heli = null, S = { dron: false, aereo: false, torreta: false };
 let record = 0;
 try { record = +localStorage.getItem('faro_record') || 0; } catch (e) {}
 
-// ---------- Perfil: experiencia, nivel y camuflajes (se guarda en el navegador) ----------
-let PERFIL = { xp: 0, camo: 0, stats: { partidas: 0, victorias: 0, bajas: 0 } };
-try { PERFIL = { ...PERFIL, ...JSON.parse(localStorage.getItem('faro_perfil') || '{}') }; } catch (e) {}
+// ---------- Perfil del jugador (ver progreso/perfil.js) ----------
 let recordSup = 0; try { recordSup = +localStorage.getItem('faro_record_sup') || 0; } catch (e) {}
-PERFIL.stats = { partidas: 0, victorias: 0, bajas: 0, ...(PERFIL.stats || {}) };
-const sumarStat = k => { PERFIL.stats[k]++; guardarPerfil(); };
-const guardarPerfil = () => { try { localStorage.setItem('faro_perfil', JSON.stringify(PERFIL)); } catch (e) {} };
-const NIVEL_MAX = 10;
-const xpTotal = n => 400 * (n - 1) * n;            // XP total para llegar al nivel n
-const nivelActual = () => { let n = 1; while (n < NIVEL_MAX && PERFIL.xp >= xpTotal(n + 1)) n++; return n; };
-const PREMIOS = { 2: '+10 VIDA MÁXIMA', 3: 'CAMUFLAJE DESIERTO', 4: 'FUSIL +15% DAÑO', 5: '+1 GRANADA AL EMPEZAR',
-  6: 'CAMUFLAJE NIEVE', 7: '+10 VIDA MÁXIMA', 8: 'ESCOPETA +2 PERDIGONES', 9: 'CAMUFLAJE NOCHE', 10: '+15 VIDA Y CAMUFLAJE DORADO' };
-const CAMOS = [
-  { n: 'BOSQUE', nivel: 1, c: '#3f7a3a', h: '#2e5a2b' }, { n: 'DESIERTO', nivel: 3, c: '#a08a55', h: '#7a6a3a' },
-  { n: 'NIEVE', nivel: 6, c: '#c8ccd0', h: '#8a9098' }, { n: 'NOCHE', nivel: 9, c: '#2a3550', h: '#1a2238' },
-  { n: 'DORADO', nivel: 10, c: '#d4a830', h: '#a07818' }];
-function maxVida() { const n = nivelActual(); return 100 + (n >= 2 ? 10 : 0) + (n >= 7 ? 10 : 0) + (n >= 10 ? 15 : 0) + (G && G.mej && G.mej.chaleco ? 25 : 0); }
-const nivelDe = () => (P && P.nivel) || nivelActual();
-function mulDanio(arma) { if (arma !== 1) return 1; return (nivelDe() >= 4 ? 1.15 : 1) * (1 + 0.2 * (G.mej ? G.mej.fusil : 0)); }
-function extraPerdigones(arma) { if (arma !== 2) return 0; return (nivelDe() >= 8 ? 2 : 0) + 2 * (G.mej ? G.mej.escopeta : 0); }
-function ganarXp(x) {
-  const antes = nivelActual(); PERFIL.xp += Math.round(x); const ahora = nivelActual();
-  if (ahora > antes) {
-    banner(`¡NIVEL ${ahora}!`, 'Desbloqueaste: ' + PREMIOS[ahora], 3.5); Snd.play('victoria');
-    if (P) { P.maxhp = maxVida(); P.hp = P.maxhp; }
-  }
-  guardarPerfil();
+const nivelActual = nivelPerfil;
+function maxVida(j) {
+  j = j || P; const pk = perksDe(j && j.op);
+  return 100 + 2 * Math.floor(((j && j.nivel) || nivelActual()) / 5) + pk.hpAdd + (G && G.mej && G.mej.chaleco && (!RED.activo || j === YO) ? 25 : 0);
 }
-function cambiarCamo() {
-  const n = nivelActual(); let i = PERFIL.camo;
-  do { i = (i + 1) % CAMOS.length; } while (CAMOS[i].nivel > n);
-  PERFIL.camo = i; guardarPerfil();
+const mulDanio = arma => (arma === 1 ? 1 + 0.2 * (G.mej ? G.mej.fusil : 0) : 1);          // mejoras de la tienda del escuadrón (sólo vos)
+const extraPerdigones = arma => (arma === 2 ? 2 * (G.mej ? G.mej.escopeta : 0) : 0);
+// Color del soldado: el camuflaje elegido, o los colores del operador si usa el de serie
+function colorJ(j) { const c = CAMO_POR_ID(j && j.camoId); return c.id !== 'bosque' ? c : OPERADOR_POR_ID(j && j.op).paleta; }
+function ganarXp(x) {
+  const antes = nivelActual(), real = ganarXpPerfil(x), ahora = nivelActual();
+  if (ahora > antes) {
+    banner(`¡NIVEL ${ahora}!`, 'Tenés recompensas nuevas en el PASE DE BATALLA', 3.5); Snd.play('victoria');
+    if (P && !P.muerto) { P.nivel = ahora; const mv = maxVida(P); P.hp += mv - P.maxhp; P.maxhp = mv; }
+  }
+  return real;
+}
+// Al terminar la partida se pagan créditos según la experiencia ganada
+function cerrarPartida() {
+  if (G.cerrada || G.modo === 'tiro') return; G.cerrada = true;
+  G.creditosGanados = Math.floor((G.xpPartida || 0) / 4); darCreditos(G.creditosGanados);
 }
 
 // ---------- Tienda entre zonas ----------
@@ -411,31 +398,56 @@ function comprar(it) {
   G.gastado += it.p; G.compras[it.id] = veces + 1; it.f(); Snd.play('item');
 }
 function nuevoEstado() {
-  return { estado: 'titulo', modo: 'campania', gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 }, xpPartida: 0, zona: 0, fase: 'banner', faseT: 0, ola: 0, cola: [], spawnT: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0,
+  return { feed: [], alerta: null, estado: 'titulo', modo: 'campania', gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 }, xpPartida: 0, zona: 0, fase: 'banner', faseT: 0, ola: 0, cola: [], spawnT: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0,
     racha: 0, tiempo: 0, banner: null, radio: null, toasts: [], shake: 0, rojo: 0, hitmark: 0, hitBaja: false, retroceso: 0,
     jefe: null, muerteT: 0, botones: [], cp: null, ganoT: 0 };
 }
 G = nuevoEstado();
-function nuevoJugador(x, y) {
-  const mv = maxVida();
-  return { x, y, r: 6, hp: mv, maxhp: mv, ang: 0, arma: 1, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }], gran: 3,
-    cd: 0, recarga: 0, ultGolpe: 99, oculto: false, paso: 0, corriendo: false };
+function nuevoJugador(x, y, equip) {
+  const j = { x, y, r: 6, ang: 0, arma: 1, cd: 0, recarga: 0, ultGolpe: 99, oculto: false, paso: 0, corriendo: false, mun: [], gran: 3 };
+  equiparJugador(j, equip || equipoLocal());
+  return j;
 }
-
-function iniciarJuego() {
-  Snd.init(); sumarStat('partidas');
+// Calcula las armas (con accesorios) y los poderes del operador de un jugador
+function equiparJugador(j, e) {
+  j.op = e.op || 'faro'; j.nivel = e.nivel || 1; j.camoId = e.camo || 'bosque';
+  j.W = [0, 1, 2].map(i => statsArma(i, (e.ar && e.ar[i]) || {}, j.op));
+  const pk = perksDe(j.op);
+  j.velMul = pk.velMul; j.regenMul = pk.regenMul;
+  j.mun = [{ c: j.W[0].cargador, res: Infinity }, { c: j.W[1].cargador, res: 90 }, { c: j.W[2].cargador, res: 12 }];
+  j.gran = 3 + pk.granAdd;
+  j.maxhp = maxVida(j); j.hp = j.maxhp;
+}
+function iniciarJuego(opc = {}) {
+  Snd.init(); if (!opc.tiro) sumarStat('partidas');
   construirMapa(); pintarMundo(); construirGrilla(); campoT = 0;
   G = nuevoEstado();
-  G.cp = { zona: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0, mun: [{ c: 12, res: Infinity }, { c: 30, res: 90 }, { c: 6, res: 12 }],
-    gran: 3 + (nivelActual() >= 5 ? 1 : 0), racha: 0, S: { dron: false, aereo: false, torreta: false }, gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 } };
+  G.cp = { zona: 0, pts: 0, bajas: 0, disparos: 0, aciertos: 0, mun: null, gran: null, racha: 0, S: { dron: false, aereo: false, torreta: false }, gastado: 0, compras: {}, mej: { chaleco: 0, fusil: 0, escopeta: 0 } };
   cargarCheckpoint();
+}
+// Campo de tiro: blancos que reaparecen, munición infinita, ideal para probar accesorios
+let BLANCOS = [];
+function iniciarTiro() {
+  iniciarJuego({ tiro: true });
+  G.modo = 'tiro'; G.cp.zona = 2; cargarCheckpoint();
+  portones.forEach(p => { p.abierto = true; });
+  P.x = 1840; P.y = 450; G.fase = 'tiro'; G.tiroT = 0; G.danioTiro = 0;
+  // Los blancos van en lugares despejados y a la vista, de cerca a lejos
+  BLANCOS = [];
+  for (const dx of [130, 190, 250, 310, 370, 430]) for (const dy of [0, -60, 60, -30, 30, -90, 90]) {
+    const x = P.x + dx, y = P.y + dy;
+    if (!circuloBloqueado(x, y, 14) && hayVision(P.x, P.y, x, y) && !BLANCOS.some(o => Math.hypot(o[0] - x, o[1] - y) < 40)) { BLANCOS.push([x, y]); break; }
+  }
+  banner('CAMPO DE TIRO', 'Sin enemigos: probá tus accesorios en los blancos', 3);
+  radio('Disparale a los blancos. Cambiá de arma con 1, 2 y 3.', 'INSTRUCTOR');
 }
 // Modo supervivencia: oleadas infinitas en el faro
 function iniciarSupervivencia() {
   iniciarJuego();
   G.modo = 'supervivencia';
-  G.cp.zona = 3; G.cp.gran = 4 + (nivelActual() >= 5 ? 1 : 0); G.cp.mun[1].res = 150; G.cp.mun[2].res = 24;
+  G.cp.zona = 3;
   cargarCheckpoint();
+  P.mun[1].res = 150; P.mun[2].res = 24; P.gran += 1;
   P.x = 3060; P.y = 450;
   banner('MODO SUPERVIVENCIA', '¿Cuántas oleadas aguantás?', 3);
   radio('No viene ningún helicóptero. Aguantá todo lo que puedas.');
@@ -455,7 +467,8 @@ function cargarCheckpoint() {
   G.gastado = cp.gastado || 0; G.compras = { ...(cp.compras || {}) }; G.mej = { chaleco: 0, fusil: 0, escopeta: 0, ...(cp.mej || {}) };
   if (esSup()) portones.forEach(p => p.abierto = true);
   P = nuevoJugador(z.entrada[0], z.entrada[1]);
-  P.mun = cp.mun.map(m => ({ ...m })); P.gran = cp.gran;
+  if (cp.mun) { P.mun = cp.mun.map(m => ({ ...m })); P.mun.forEach((m, i) => { m.c = Math.min(m.c, P.W[i].cargador); }); }
+  if (cp.gran != null) P.gran = cp.gran;
   Object.assign(G, { estado: 'jugando', zona: cp.zona, pts: cp.pts, bajas: cp.bajas, disparos: cp.disparos, aciertos: cp.aciertos,
     racha: cp.racha, jefe: null, muerteT: 0, rojo: 0, toasts: [], ganoT: 0 });
   S = { ...cp.S };
@@ -478,14 +491,14 @@ function iniciarOla(i) {
     const r = Math.random(); let t = 'soldado';
     if (gw >= 2 && r < 0.24) t = 'corredor';
     else if (gw >= 4 && r < 0.24 + Math.min(0.22, 0.08 + gw * 0.02)) t = 'pesado';
-    else if (gw >= 1 && r > 0.87) t = 'perro';
+    else if (gw >= 3 && r > 0.94) t = 'perro';
     else if (gw >= 3 && r > 0.76) t = 'francotirador';
     G.cola.push(t);
   }
-  if (gw >= 1 && Math.random() < 0.5) G.cola.push('perro', 'perro');   // los perros vienen en jauría
   if (sup && (i + 1) % 5 === 0) G.cola.push('jefe');
   G.spawnT = 0.5;
   banner(`OLEADA ${sup ? i + 1 : gw + 1}`, `${G.cola.length} enemigos`, 2);
+  alerta('PATRULLA ENEMIGA APROXIMÁNDOSE', 3);
   Snd.play('alarma');
 }
 
@@ -540,7 +553,7 @@ function hayVision(x1, y1, x2, y2) { for (const o of obstaculos) if (bloqueaBala
 
 // ---------- Jugador: armas ----------
 function disparar() {
-  const w = ARMAS[P.arma], m = P.mun[P.arma];
+  const w = P.W[P.arma], m = P.mun[P.arma];
   if (P.recarga > 0 || P.cd > 0) return;
   if (m.c <= 0) {
     if (m.res > 0) recargar();
@@ -552,21 +565,21 @@ function disparar() {
   const extra = (P.corriendo ? 1.6 : 1) * (1 + G.retroceso * 0.15);
   for (let i = 0, np = w.perdigones + extraPerdigones(P.arma); i < np; i++) {
     const a = P.ang + rand(-w.disp, w.disp) * extra, v = w.vel * rand(0.92, 1.05);
-    balas.push({ x: mx, y: my, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: w.vida, dmg: w.dmg * mulDanio(P.arma), duenio: 'j', src: 'arma', eq: P.equipo, id: P.id });
+    balas.push({ x: mx, y: my, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vida: w.vida, dmg: w.dmg * mulDanio(P.arma), duenio: 'j', src: 'arma', eq: P.equipo, id: P.id, ar: P.arma });
   }
-  fogonazos.push({ x: mx, y: my, k: 0.06, r: 46 });
+  fogonazos.push({ x: mx, y: my, k: 0.06, r: w.sil ? 22 : 46 });
   const pa = P.ang + Math.PI / 2;
   particulas.push({ x: P.x, y: P.y, vx: Math.cos(pa) * rand(30, 50), vy: Math.sin(pa) * rand(30, 50), vida: 1.5, max: 1.5, c: '#d8b040', s: 1, roce: 6, piso: true });
   if (!MP() || P === YO) { G.shake = Math.max(G.shake, w.retro * 0.8); G.retroceso = Math.min(4, G.retroceso + w.retro * 0.5); }
-  Snd.play(w.sfx);
+  Snd.play(w.sfx, w.sil ? 0.4 : 1);
 }
 function recargar() {
-  const w = ARMAS[P.arma], m = P.mun[P.arma];
+  const w = P.W[P.arma], m = P.mun[P.arma];
   if (P.recarga > 0 || m.c >= w.cargador || m.res <= 0) return;
   P.recarga = w.recarga; Snd.play('recarga');
 }
 function finRecarga() {
-  const w = ARMAS[P.arma], m = P.mun[P.arma];
+  const w = P.W[P.arma], m = P.mun[P.arma];
   const tomo = Math.min(w.cargador - m.c, m.res); m.c += tomo; m.res -= tomo;
 }
 function cambiarArma(i) {
@@ -627,6 +640,8 @@ function herirJugador(dmg, sx, sy, quien) {
 }
 function golpearEnemigo(e, dmg, b, src) {
   if (e.muerto) return;
+  ARMA_KILL = b && b.ar != null ? b.ar : null;
+  if (src === 'arma' && G.modo === 'tiro') G.danioTiro = (G.danioTiro || 0) + Math.min(dmg, Math.max(0, e.hp));
   e.hp -= dmg; e.flash = 0.08;
   if (b) { const v = Math.hypot(b.vx, b.vy) || 1; e.x += b.vx / v * 1.5; e.y += b.vy / v * 1.5; }
   for (let i = 0; i < 3; i++) particulas.push({ x: e.x, y: e.y, vx: rand(-40, 40), vy: rand(-40, 40), vida: 0.4, max: 0.4, c: '#a01818', s: 1, roce: 4 });
@@ -637,11 +652,34 @@ function golpearEnemigo(e, dmg, b, src) {
     if (c) { e.estado = 'cubierto'; e.cx = c.x; e.cy = c.y; e.estT = rand(1.5, 3); e.cubCd = 6; }
   }
 }
+const NOMBRE_ENEMIGO = { soldado: 'Hostil', corredor: 'Infiltrado', pesado: 'Pesado', francotirador: 'Francotirador', perro: 'Perro', jefe: 'Comandante', maniqui: 'Blanco' };
+function pushFeed(quien, arma, objetivo) { G.feed.unshift({ id: ++idFeed, quien, arma, objetivo, k: 0 }); if (G.feed.length > 5) G.feed.pop(); }
+function alerta(txt, dur = 3) { G.alerta = { txt, t: dur }; }
+function registrarBaja(e, src) {
+  const k = MP() ? jugadores.find(o => o.id === TIRADOR) : null;
+  const quien = k ? k.nombre : (MP() ? 'APOYO' : miNombre());
+  const arma = src === 'arma' && ARMA_KILL != null ? ARMAS[ARMA_KILL].nombre : src === 'granada' ? 'GRANADA' : src === 'racha' ? 'RACHA' : 'ARMA';
+  pushFeed(quien, arma, NOMBRE_ENEMIGO[e.tipo] || 'Hostil');
+  if (src === 'arma' && ARMA_KILL != null && (!MP() || (YO && TIRADOR === YO.id))) sumarMaestria(ARMA_KILL);
+}
+function dibujarBlanco(g, e) {
+  g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.ellipse(e.x + 1, e.y + 2, 8, 6, 0, 0, 7); g.fill();
+  const f = e.flash > 0;
+  g.fillStyle = f ? '#fff' : '#d8d8d8'; g.beginPath(); g.arc(e.x, e.y, 7, 0, 7); g.fill();
+  g.fillStyle = f ? '#fff' : '#c03030'; g.beginPath(); g.arc(e.x, e.y, 5, 0, 7); g.fill();
+  g.fillStyle = f ? '#fff' : '#d8d8d8'; g.beginPath(); g.arc(e.x, e.y, 3, 0, 7); g.fill();
+  g.fillStyle = '#c03030'; g.beginPath(); g.arc(e.x, e.y, 1.2, 0, 7); g.fill();
+}
 function matarEnemigo(e, src) {
-  e.muerto = true; G.bajas++; G.pts += e.T.pts; pop(e.x, e.y - 8, '+' + e.T.pts);
+  if (e.T.estatico) {   // los blancos no dan puntos ni sueltan nada
+    e.muerto = true; Snd.play('baja');
+    for (let i = 0; i < 8; i++) particulas.push({ x: e.x, y: e.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.5, max: 0.5, c: i % 2 ? '#c03030' : '#d8d8d8', s: 2, roce: 5 });
+    return;
+  }
+  e.muerto = true; G.bajas++; G.pts += e.T.pts; pop(e.x, e.y - 8, '+' + e.T.pts); registrarBaja(e, src);
   if (MP()) acreditarBaja(TIRADOR, e.T.pts, src === 'arma' || src === 'granada');
   else {
-    G.xpPartida += e.T.pts; ganarXp(e.T.pts); sumarStat('bajas');
+    G.xpPartida += ganarXp(e.T.pts); sumarStat('bajas');
     if (src === 'arma' || src === 'granada') { sumarRacha(); G.hitBaja = true; G.hitmark = 0.25; }
   }
   Snd.play('baja');
@@ -684,7 +722,7 @@ function explotar(x, y, r, dmg, o = {}) {
   G.shake = Math.max(G.shake, 7 * clamp(1 - dist(x, y, yo.x, yo.y) / 500, 0.2, 1)); Snd.play('boom', clamp(1 - dist(x, y, yo.x, yo.y) / 600, 0.25, 1));
 }
 function morir() {
-  G.estado = 'muerto'; G.muerteT = 0; Snd.play('derrota');
+  G.estado = 'muerto'; G.muerteT = 0; Snd.play('derrota'); cerrarPartida();
   if (esSup() && (G.olasSup || 0) > recordSup) { recordSup = G.olasSup; try { localStorage.setItem('faro_record_sup', recordSup); } catch (e) {} }
   for (let i = 0; i < 16; i++) particulas.push({ x: P.x, y: P.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.8, max: 0.8, c: '#3f7a3a', s: 2, roce: 4 });
 }
@@ -782,7 +820,7 @@ function dispararEnemigo(e) {
   Snd.play('eshot', clamp(1 - dist(e.x, e.y, yo.x, yo.y) / 400, 0.2, 1));
 }
 function actualizarEnemigo(e, dt) {
-  const T = e.T; e.flash -= dt; e.visT -= dt; e.cubCd -= dt;
+  const T = e.T; e.flash -= dt; if (T.estatico) return; e.visT -= dt; e.cubCd -= dt;
   const dx = P.x - e.x, dy = P.y - e.y, d = Math.hypot(dx, dy) || 1;
   if (e.visT <= 0) { e.vis = !P.oculto && hayVision(e.x, e.y, P.x, P.y); e.visT = rand(0.12, 0.22); }
   const quiere = Math.atan2(dy, dx);
@@ -792,7 +830,7 @@ function actualizarEnemigo(e, dt) {
     const c = e.vis ? null : dirCampo(e);
     if (c) { mx = c.x; my = c.y; } else { mx = dx / d; my = dy / d; }
     e.ang = quiere; e.meleeCd -= dt;
-    if (d < e.r + P.r + 3 && e.meleeCd <= 0) { herirJugador(T.melee, e.x, e.y); e.meleeCd = T.perro ? 0.6 : 0.8; Snd.play(T.perro ? 'ladrido' : 'cuchillo'); }
+    if (d < e.r + P.r + 3 && e.meleeCd <= 0) { herirJugador(T.melee, e.x, e.y); e.meleeCd = T.perro ? 1.1 : 0.8; Snd.play(T.perro ? 'ladrido' : 'cuchillo'); }
   } else {
     e.estT -= dt;
     if (e.estado === 'cubierto') {
@@ -813,6 +851,7 @@ function actualizarEnemigo(e, dt) {
     e.ang += angDif(e.ang, quiere) * Math.min(1, dt * 6);
     if (e.vis && d < T.rango * 1.5) {
       e.disCd -= dt;
+      if (T.sniper && e.disCd < 1.3 && !G.alerta) alerta('¡FRANCOTIRADOR TE TIENE EN LA MIRA!', 2.5);
       if (e.disCd <= 0) { dispararEnemigo(e); e.disCd = rand(T.cad[0], T.cad[1]); }
     } else e.disCd = Math.max(e.disCd, 0.5);
     if (T.jefe) {
@@ -941,6 +980,8 @@ function actualizar(dt) {
   NOW += dt;
   if (G.banner) { G.banner.k += dt; if (G.banner.k > G.banner.dur) G.banner = null; }
   if (G.radio) { G.radio.k += dt; if (G.radio.k > G.radio.dur) G.radio = null; }
+  if (G.alerta) { G.alerta.t -= dt; if (G.alerta.t <= 0) G.alerta = null; }
+  if (G.feed.length) { G.feed.forEach(f => { f.k += dt; }); G.feed = G.feed.filter(f => f.k < 7); }
   G.toasts.forEach(t => t.k += dt); G.toasts = G.toasts.filter(t => t.k < 2.5);
   G.shake = Math.max(0, G.shake - dt * 25);
 
@@ -1122,6 +1163,16 @@ function actualizarMision(dt) {
   const Z = ZONAS[G.zona];
   G.faseT -= dt;
   switch (G.fase) {
+    case 'tiro': {
+      for (const m of P.mun) if (m.res !== Infinity) m.res = Math.max(m.res, 99);
+      G.tiroT = (G.tiroT || 0) - dt;
+      if (G.tiroT <= 0) {
+        G.tiroT = 1.2;
+        const vivos = new Set(enemigos.filter(e => e.T.estatico && !e.muerto).map(e => e.slot));
+        BLANCOS.forEach(([x, y], i) => { if (!vivos.has(i)) { const b = crearEnemigo('maniqui', x, y); b.slot = i; b.hp = b.maxhp = 220; } });
+      }
+      break;
+    }
     case 'banner': if (G.faseT <= 0) iniciarOla(0); break;
     case 'ola': {
       const sup = esSup();
@@ -1129,7 +1180,7 @@ function actualizarMision(dt) {
       G.spawnT -= dt;
       if (G.cola.length && G.spawnT <= 0 && enemigos.length < maxVivos) { if (spawnear(G.cola[0])) G.cola.shift(); G.spawnT = rand(0.5, 1.1); }
       if (!G.cola.length && !enemigos.length) {
-        const bonus = 250 * (olaGlobal() + 1); G.pts += bonus; ganarXp(bonus / 5); Snd.play('racha');
+        const bonus = 250 * (olaGlobal() + 1); G.pts += bonus; G.xpPartida += ganarXp(bonus / 5); Snd.play('racha');
         if (sup) {
           G.fase = 'descanso'; G.faseT = 6; G.olasSup = G.ola + 1;
           banner(`OLEADA ${G.ola + 1} SUPERADA`, `+${bonus} puntos · próxima en 6s`, 2.5);
@@ -1161,7 +1212,7 @@ function actualizarMision(dt) {
     case 'defensa':
       G.spawnT -= dt;
       if (G.spawnT <= 0 && enemigos.length < 12) {
-        const r = Math.random(); spawnear(r < 0.25 ? 'corredor' : r < 0.45 ? 'pesado' : r < 0.58 ? 'perro' : r < 0.68 ? 'francotirador' : 'soldado'); G.spawnT = rand(1.2, 1.8);
+        const r = Math.random(); spawnear(r < 0.25 ? 'corredor' : r < 0.45 ? 'pesado' : r < 0.51 ? 'perro' : r < 0.68 ? 'francotirador' : 'soldado'); G.spawnT = rand(1.2, 1.8);
       }
       if (G.faseT <= 0) {
         G.fase = 'extraccion'; heli = { x: 3800, y: 420, alt: 70, estado: 'llegando', k: 0, sx: 3800, sy: 420 };
@@ -1174,7 +1225,7 @@ function actualizarMision(dt) {
       if (G.spawnT <= 0 && enemigos.length < 8) { spawnear(Math.random() < 0.5 ? 'corredor' : 'soldado'); G.spawnT = rand(2.5, 3.5); }
       if (heli && heli.estado === 'aterrizado' && dist(P.x, P.y, PAD.x, PAD.y) < 26) {
         P.oculto = true; heli.estado = 'despegando'; heli.k = 0; G.fase = 'fin';
-        G.pts += 2000 + Math.round(P.hp) * 10; ganarXp(1000); G.xpPartida += 1000; banner('¡EXTRACCIÓN!', '+2000 puntos', 3);
+        G.pts += 2000 + Math.round(P.hp) * 10; G.xpPartida += ganarXp(1000); banner('¡EXTRACCIÓN!', '+2000 puntos', 3);
       }
       break;
     case 'fin':
@@ -1196,7 +1247,7 @@ function actualizarHeli(dt) {
   if (heli.sonT <= 0) { heli.sonT = 0.09; Snd.play('helice', clamp(1 - dist(heli.x, heli.y, P.x, P.y) / 700, 0.15, 1)); }
 }
 function ganar() {
-  sumarStat('victorias');
+  sumarStat('victorias'); cerrarPartida();
   G.estado = 'victoria'; G.ganoT = 0; Snd.play('victoria'); borrarPartida();
   G.nuevoRecord = G.pts > record;
   if (G.nuevoRecord) { record = G.pts; try { localStorage.setItem('faro_record', record); } catch (e) {} }
@@ -1278,7 +1329,8 @@ function render() {
   }
   // Enemigos
   for (const e of enemigos) if (visible(e.x, e.y)) {
-    if (e.T.perro) dibujarPerro(lx, e);
+    if (e.T.estatico) dibujarBlanco(lx, e);
+    else if (e.T.perro) dibujarPerro(lx, e);
     else dibujarSoldado(lx, e.x, e.y, e.ang, e.r, e.T.cuerpo, e.T.casco, e.T.arma, e.flash > 0, e.paso);
     if (e.T.pesado || e.tipo === 'pesado') { lx.fillStyle = '#6a6a72'; lx.fillRect(e.x - 3, e.y - 3, 2, 6); }
     if (e.hp < e.maxhp && !e.T.jefe) { lx.fillStyle = '#300'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12, 2); lx.fillStyle = '#e03030'; lx.fillRect(e.x - 6, e.y - e.r - 5, 12 * e.hp / e.maxhp, 2); }
@@ -1287,15 +1339,15 @@ function render() {
   if (MP()) for (const j of jugadores) {
     if (j.muerto || (j.inv > 0 && Math.floor(NOW * 10) % 2)) continue;
     if (G.modo === 'equipos') { lx.strokeStyle = j.equipo === 'verde' ? '#40ff40' : '#ff4040'; lx.lineWidth = 1; lx.beginPath(); lx.ellipse(j.x, j.y + 1, 8, 6, 0, 0, 7); lx.stroke(); }
-    const cm = CAMOS[j.camo || 0];
+    const cm = colorJ(j);
     dibujarSoldado(lx, j.x, j.y, j.ang, j.r, cm.c, cm.h, j.arma === 2 ? 10 : j.arma === 1 ? 9 : 5, false, j.paso);
-    if (j === YO && j.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(j.x - 8, j.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(j.x - 8, j.y - 13, 16 * (1 - j.recarga / ARMAS[j.arma].recarga), 2); }
+    if (j === YO && j.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(j.x - 8, j.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(j.x - 8, j.y - 13, 16 * (1 - j.recarga / j.W[j.arma].recarga), 2); }
     if (j !== YO && j.hp < j.maxhp) { lx.fillStyle = '#300'; lx.fillRect(j.x - 6, j.y - 11, 12, 2); lx.fillStyle = '#40d040'; lx.fillRect(j.x - 6, j.y - 11, 12 * j.hp / j.maxhp, 2); }
   }
   // Jugador
   else if (!enMenu() && !P.oculto && G.estado !== 'muerto') {
-    dibujarSoldado(lx, P.x, P.y, P.ang, P.r, CAMOS[PERFIL.camo].c, CAMOS[PERFIL.camo].h, P.arma === 2 ? 10 : P.arma === 1 ? 9 : 5, false, P.paso);
-    if (P.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(P.x - 8, P.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(P.x - 8, P.y - 13, 16 * (1 - P.recarga / ARMAS[P.arma].recarga), 2); }
+    dibujarSoldado(lx, P.x, P.y, P.ang, P.r, colorJ(P).c, colorJ(P).h, P.arma === 2 ? 10 : P.arma === 1 ? 9 : 5, false, P.paso);
+    if (P.recarga > 0) { lx.fillStyle = '#222'; lx.fillRect(P.x - 8, P.y - 13, 16, 2); lx.fillStyle = '#ffe060'; lx.fillRect(P.x - 8, P.y - 13, 16 * (1 - P.recarga / P.W[P.arma].recarga), 2); }
   }
   // Drones (con sombra)
   for (const d of drones) {
@@ -1408,6 +1460,7 @@ function render() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(low, 0, 0, VW, VH, OX, OY, VW * ESC, VH * ESC);
+  dibujarLluvia();
   ctx.save(); ctx.translate(OX, OY); ctx.scale(ESC, ESC);
   ctx.beginPath(); ctx.rect(0, 0, VW, VH); ctx.clip();
   dibujarCapaMundo(cx, cy);
@@ -1443,7 +1496,7 @@ function txt(s, x, y, size = 8, color = '#fff', align = 'left') {
 function dibujarMira() {
   if (G.estado !== 'jugando' || G.pausaLocal) return;
   const x = mouse.x, y = mouse.y;
-  const w = ARMAS[P.arma], gap = 3 + w.disp * 30 + G.retroceso * 1.5;
+  const w = P.W[P.arma], gap = 3 + w.disp * 30 + G.retroceso * 1.5;
   ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(x - gap - 4, y); ctx.lineTo(x - gap, y); ctx.moveTo(x + gap, y); ctx.lineTo(x + gap + 4, y);
@@ -1548,7 +1601,7 @@ function continuarPartida() {
    - Modos: COOPERATIVO (todos contra la compu) y EQUIPOS (verde vs rojo).
    - La compu puede manejar BOTS para completar los equipos.
    ===================================================================== */
-let jugadores = [], YO = null, TIRADOR = null;
+let jugadores = [], YO = null, TIRADOR = null, ARMA_KILL = null, idFeed = 0;
 const campoEq = { verde: new Int32Array(GWd * GHd), rojo: new Int32Array(GWd * GHd) };
 const RED = { activo: false, host: false, cliente: false, peer: null, conns: [], conn: null, codigo: '', miId: '', estado: '', error: '',
   acc: [], envT: 0, salaT: 0, salaModo: 'coop', bots: 2, sala: [], ev: [], bannerKey: '', radioKey: '' };
@@ -1563,6 +1616,14 @@ const salaURL = (() => { try { const s = new URLSearchParams(location.search).ge
 const _play = Snd.play.bind(Snd);
 Snd.play = function (n, v = 1) { _play(n, v); if (RED.host && MP() && !PERSONALES.has(n) && RED.ev.length < 24) RED.ev.push([n, Math.round(v * 100) / 100]); };
 
+// Lo que cada jugador manda a la sala: operador, camuflaje, nivel y armas equipadas
+function equipoLocalSala() { const e = equipoLocal(); return { op: e.op, camo: e.camo, nivel: e.nivel, ar: e.ar }; }
+// El anfitrión no confía en lo que llega: sólo acepta cosas que existen en el catálogo
+function sanearEquipo(d) {
+  const op = OPERADOR_POR_ID(d.op).id, camo = CAMO_POR_ID(d.camo).id, ar = { 0: {}, 1: {}, 2: {} };
+  for (const i of [0, 1, 2]) { const e = d.ar && d.ar[i]; if (e && typeof e === 'object') for (const slot of Object.keys(e)) if (typeof e[slot] === 'string' && e[slot].length < 20) ar[i][slot] = e[slot]; }
+  return { op, camo, nivel: clamp(+d.nivel || 1, 1, NIVEL_MAX), ar };
+}
 function miNombre() { try { return localStorage.getItem('faro_nombre') || 'SOLDADO'; } catch (e) { return 'SOLDADO'; } }
 function limpiarNombre(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9ÁÉÍÓÚÑ ]/g, '').trim().slice(0, 10) || 'SOLDADO'; }
 const vidaNivel = n => 100 + (n >= 2 ? 10 : 0) + (n >= 7 ? 10 : 0) + (n >= 10 ? 15 : 0);
@@ -1607,7 +1668,7 @@ function moverJugador(j, inp, dt) {
   if (!inp) inp = { ix: 0, iy: 0, ang: j.ang };
   j.inv = Math.max(0, (j.inv || 0) - dt);
   j.corriendo = !!inp.correr;
-  const vel = 88 * (j.corriendo ? 1.45 : 1);
+  const vel = 88 * (j.corriendo ? 1.45 : 1) * (j.velMul || 1) * (j.W ? j.W[j.arma].mov : 1);
   if (!j.oculto) {
     const ox = j.x, oy = j.y;
     j.x += inp.ix * vel * dt; j.y += inp.iy * vel * dt; resolver(j);
@@ -1620,7 +1681,7 @@ function moverJugador(j, inp, dt) {
   if (inp.fuego && !j.oculto) disparar();
   // Regeneración estilo COD: si no te pegan por 3.5s, te curás
   j.ultGolpe += dt;
-  if (j.ultGolpe > 3.5 && j.hp < j.maxhp) j.hp = Math.min(j.maxhp, j.hp + 30 * dt);
+  if (j.ultGolpe > 3.5 && j.hp < j.maxhp) j.hp = Math.min(j.maxhp, j.hp + 30 * (j.regenMul || 1) * dt);
 }
 function recogerItems(j) {
   for (const it of items) {
@@ -1681,7 +1742,7 @@ function entradaBot(j, dt) {
 // ---------- Bajas, caídas y reaparición ----------
 function darXp(k, n) {
   if (!k || k.bot) return;
-  if (k === YO) { ganarXp(n); G.xpPartida += n; }
+  if (k === YO) { G.xpPartida += ganarXp(n); }
   else if (k.conn) enviar(k.conn, { t: 'xp', n });
 }
 function avisarHit(id, baja) { const k = jugadores.find(o => o.id === id); if (k && k.conn) enviar(k.conn, { t: 'hm', baja: !!baja }); }
@@ -1696,17 +1757,17 @@ function acreditarBaja(id, pts, cuentaRacha) {
 }
 function caer(j, quien) {
   j.muerto = true; j.hp = 0; j.muertes = (j.muertes || 0) + 1; j.respT = G.modo === 'equipos' ? 4 : 12;
-  for (let i = 0; i < 16; i++) particulas.push({ x: j.x, y: j.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.8, max: 0.8, c: CAMOS[j.camo || 0].c, s: 2, roce: 4 });
+  for (let i = 0; i < 16; i++) particulas.push({ x: j.x, y: j.y, vx: rand(-60, 60), vy: rand(-60, 60), vida: 0.8, max: 0.8, c: colorJ(j).c, s: 2, roce: 4 });
   items.push({ x: j.x, y: j.y, tipo: 'municion', k: 20 });
   if (j === YO) Snd.play('derrota');
   const k = jugadores.find(o => o.id === quien);
   if (G.modo === 'equipos') {
-    if (k && k.equipo !== j.equipo) { acreditarBaja(k.id, 100, true); G.marc[k.equipo]++; avisoTodos(`${k.nombre} eliminó a ${j.nombre}`, k.equipo === 'verde' ? '#80ff80' : '#ff8080'); }
+    if (k && k.equipo !== j.equipo) { acreditarBaja(k.id, 100, true); G.marc[k.equipo]++; pushFeed(k.nombre, 'ARMA', j.nombre); avisoTodos(`${k.nombre} eliminó a ${j.nombre}`, k.equipo === 'verde' ? '#80ff80' : '#ff8080'); }
     else avisoTodos(`${j.nombre} cayó`, '#c0c0c0');
   } else {
     avisoTodos(`${j.nombre} cayó · vuelve en ${j.respT}s`, '#ff9090');
     if (jugadores.every(o => o.muerto)) {
-      G.estado = 'muerto'; G.muerteT = 0; G.fase = 'fin';
+      G.estado = 'muerto'; G.muerteT = 0; G.fase = 'fin'; cerrarPartida();
       if ((G.olasSup || 0) > recordSup) { recordSup = G.olasSup; try { localStorage.setItem('faro_record_sup', recordSup); } catch (e) {} }
     }
   }
@@ -1725,7 +1786,7 @@ function puntoBase(j) {
 function reaparecer(j) {
   const p = puntoBase(j);
   Object.assign(j, { x: p.x, y: p.y, muerto: false, hp: j.maxhp, ultGolpe: 99, recarga: 0, inv: 2.5 });
-  j.mun[1].res = Math.max(j.mun[1].res, 90); j.mun[1].c = 30; j.gran = Math.max(j.gran, 2);
+  j.mun[1].res = Math.max(j.mun[1].res, 90); j.mun[1].c = j.W[1].cargador; j.gran = Math.max(j.gran, 2);
 }
 function reabastecerTodos() {
   for (const j of jugadores) { j.mun[1].res = Math.max(j.mun[1].res, 180); j.mun[2].res = Math.max(j.mun[2].res, 30); j.gran = Math.max(j.gran, 3); if (!j.muerto) j.hp = j.maxhp; }
@@ -1735,7 +1796,7 @@ function actualizarEquipos(dt) {
   if (G.modo !== 'equipos' || G.estado !== 'jugando') return;
   G.tiempoEq -= dt;
   if (G.marc.verde >= BAJAS_PARA_GANAR || G.marc.rojo >= BAJAS_PARA_GANAR || G.tiempoEq <= 0) {
-    G.estado = 'finEq'; G.ganoT = 0;
+    G.estado = 'finEq'; G.ganoT = 0; cerrarPartida();
     G.ganador = G.marc.verde > G.marc.rojo ? 'verde' : G.marc.rojo > G.marc.verde ? 'rojo' : 'empate';
     if (YO && G.ganador === YO.equipo) darXp(YO, 500);
     for (const j of jugadores) if (j !== YO && j.equipo === G.ganador) darXp(j, 500);
@@ -1745,10 +1806,9 @@ function actualizarEquipos(dt) {
 
 // ---------- Armar la partida ----------
 function nuevoSoldado(s, p) {
-  const j = nuevoJugador(p.x, p.y);
-  Object.assign(j, { id: s.id, nombre: s.nombre, equipo: s.equipo, camo: s.camo || 0, nivel: s.nivel || 1, bot: !!s.bot, S: { dron: false, aereo: false, torreta: false },
+  const j = nuevoJugador(p.x, p.y, { op: s.op, ar: s.ar, camo: s.camo, nivel: s.nivel });
+  Object.assign(j, { id: s.id, nombre: s.nombre, equipo: s.equipo, bot: !!s.bot, S: { dron: false, aereo: false, torreta: false },
     racha: 0, bajas: 0, muertes: 0, acc: [], inp: null, semilla: Math.random() * 10, inv: 2 });
-  j.maxhp = vidaNivel(j.nivel); j.hp = j.maxhp;
   j.conn = RED.conns.find(c => c.peer === s.id) || null;
   if (j.bot) { j.mun[1].res = 9999; j.mun[2].res = 999; }
   return j;
@@ -1761,7 +1821,7 @@ function empezarMP() {
   const lista = RED.sala.map(s => ({ ...s }));
   for (let i = 0; i < RED.bots; i++) {
     const v = lista.filter(s => s.equipo === 'verde').length, r = lista.filter(s => s.equipo === 'rojo').length;
-    lista.push({ id: 'bot' + i, nombre: 'BOT ' + (i + 1), equipo: modo === 'coop' ? 'verde' : (v <= r ? 'verde' : 'rojo'), camo: (i % 4) + 1, nivel: 3, bot: true });
+    lista.push({ id: 'bot' + i, nombre: 'BOT ' + (i + 1), equipo: modo === 'coop' ? 'verde' : (v <= r ? 'verde' : 'rojo'), camo: ['desierto', 'nieve', 'noche', 'jungla'][i % 4], op: ['sombra', 'viper', 'hielo', 'cobra'][i % 4], ar: {}, nivel: 20 + i * 3, bot: true });
   }
   if (modo === 'coop') lista.forEach(s => s.equipo = 'verde');
   jugadores = [];
@@ -1782,7 +1842,7 @@ function empezarMP() {
     banner('VERDE vs ROJO', `Gana el primer equipo con ${BAJAS_PARA_GANAR} bajas`, 3);
   }
   cam.x = clamp(YO.x - VW / 2, 0, WW - VW); cam.y = clamp(YO.y - VH / 2, 0, WH - VH);
-  todos({ t: 'start', modo, lista: jugadores.map(j => ({ id: j.id, nombre: j.nombre, equipo: j.equipo, camo: j.camo, bot: j.bot })) });
+  todos({ t: 'start', modo, lista: jugadores.map(j => ({ id: j.id, nombre: j.nombre, equipo: j.equipo, camo: j.camoId, op: j.op, bot: j.bot })) });
 }
 
 // ---------- Conexión ----------
@@ -1814,7 +1874,7 @@ async function crearSala() {
       conn.on('close', () => hostSeFue(conn));
     });
   };
-  RED.sala = [{ id: 'host', nombre: miNombre(), equipo: 'verde', nivel: nivelActual(), camo: PERFIL.camo }];
+  RED.sala = [{ id: 'host', nombre: miNombre(), equipo: 'verde', ...equipoLocalSala() }];
   RED.miId = 'host';
   intentar();
 }
@@ -1828,7 +1888,7 @@ async function unirseSala(codigo) {
   peer.on('open', id => {
     RED.miId = id;
     const conn = RED.conn = peer.connect(idSala(codigo), { reliable: true });
-    conn.on('open', () => { RED.estado = 'listo'; RED.error = ''; enviar(conn, { t: 'hola', nombre: miNombre(), nivel: nivelActual(), camo: PERFIL.camo }); });
+    conn.on('open', () => { RED.estado = 'listo'; RED.error = ''; enviar(conn, { t: 'hola', nombre: miNombre(), ...equipoLocalSala() }); });
     conn.on('data', d => clienteRecibe(d));
     conn.on('close', () => desconectado('Se cortó la conexión con la sala.'));
     setTimeout(() => { if (RED.estado === 'conectando') { RED.estado = 'error'; RED.error = `No se encontró la sala ${codigo}.`; } }, 30000);
@@ -1851,7 +1911,7 @@ function hostRecibe(conn, d) {
   if (d.t === 'hola') {
     if (RED.sala.find(s => s.id === conn.peer)) return;
     const v = RED.sala.filter(s => s.equipo === 'verde').length, r = RED.sala.length - v;
-    const s = { id: conn.peer, nombre: limpiarNombre(d.nombre), equipo: v <= r ? 'verde' : 'rojo', nivel: clamp(+d.nivel || 1, 1, NIVEL_MAX), camo: clamp(+d.camo || 0, 0, CAMOS.length - 1) };
+    const s = { id: conn.peer, nombre: limpiarNombre(d.nombre), equipo: v <= r ? 'verde' : 'rojo', ...sanearEquipo(d) };
     if (RED.sala.length >= 8) { enviar(conn, { t: 'lleno' }); return; }
     RED.sala.push(s); Snd.play('item');
     G.toasts.push({ txt: `${s.nombre} entró a la sala`, color: '#80c0ff', k: 0 });
@@ -1859,7 +1919,7 @@ function hostRecibe(conn, d) {
       if (G.modo === 'coop') s.equipo = 'verde';
       const p = G.modo === 'coop' ? puntoBase({}) : puntoBase({ equipo: s.equipo });
       jugadores.push(nuevoSoldado(s, p));
-      enviar(conn, { t: 'start', modo: G.modo, lista: jugadores.map(j => ({ id: j.id, nombre: j.nombre, equipo: j.equipo, camo: j.camo, bot: j.bot })) });
+      enviar(conn, { t: 'start', modo: G.modo, lista: jugadores.map(j => ({ id: j.id, nombre: j.nombre, equipo: j.equipo, camo: j.camoId, op: j.op, bot: j.bot })) });
       avisoTodos(`${s.nombre} se sumó a la partida`, '#80c0ff');
     }
     return;
@@ -1902,6 +1962,7 @@ function fotoJuego() {
     dr: drones.map(d => [r1(d.x), r1(d.y)]), to: torretas.map(t => [r1(t.x), r1(t.y), r2(t.ang || 0)]),
     at: ataques.map(a => [r1(a.x), r1(a.y), r2(a.ang)]), jt: jets.map(j => [r1(j.x), r1(j.y), r2(j.ang)]),
     es: estaciones.map(e => Math.ceil(e.cd)),
+    fd: G.feed.map(f => [f.quien, f.arma, f.objetivo, Math.round(f.k * 10) / 10]), al: G.alerta ? G.alerta.txt : '',
     ev: RED.ev.splice(0),
   };
 }
@@ -1945,13 +2006,14 @@ function clienteRecibe(d) {
       break;
     case 'st': aplicarFoto(d); break;
     case 'toast': G.toasts.push({ txt: String(d.txt).slice(0, 60), color: d.color, k: 0 }); if (G.toasts.length > 3) G.toasts.shift(); break;
-    case 'xp': { const n = clamp(+d.n || 0, 0, 3000); ganarXp(n); G.xpPartida += n; break; }
+    case 'xp': { const n = clamp(+d.n || 0, 0, 3000); G.xpPartida += ganarXp(n); break; }
     case 'hm': G.hitmark = d.baja ? 0.25 : 0.15; G.hitBaja = !!d.baja; _play('hit'); break;
   }
 }
 function aplicarFoto(d) {
   if (!MP()) return;
   const g = d.g;
+  if ((g[0] === 'muerto' || g[0] === 'finEq') && !G.cerrada) cerrarPartida();
   if (['jugando', 'muerto', 'finEq'].includes(g[0])) { if (g[0] === 'muerto' && G.estado !== 'muerto') G.muerteT = 0; if (g[0] === 'finEq' && G.estado !== 'finEq') G.ganoT = 0; G.estado = g[0]; }
   G.fase = g[1]; G.faseT = g[2]; G.ola = g[3]; G.cola = new Array(g[4]); G.pts = g[5]; G.marc = { verde: g[6], rojo: g[7] }; G.tiempoEq = g[8];
   G.olasSup = g[9]; G.jefe = g[10] ? { hp: g[10][0], maxhp: g[10][1], muerto: false } : null; G.zona = g[11]; G.ganador = g[12];
@@ -1963,7 +2025,7 @@ function aplicarFoto(d) {
     let j = prev.get(a[0]);
     if (!j) {
       const info = (RED.lista || []).find(s => s.id === a[0]) || {};
-      j = nuevoJugador(a[1], a[2]); Object.assign(j, { id: a[0], nombre: info.nombre || '?', equipo: info.equipo || 'verde', camo: info.camo || 0, bot: !!info.bot, S: {} });
+      j = nuevoJugador(a[1], a[2]); Object.assign(j, { id: a[0], nombre: info.nombre || '?', equipo: info.equipo || 'verde', camoId: info.camo, op: info.op, bot: !!info.bot, S: {} });
     }
     j.tx = a[1]; j.ty = a[2]; if (j.id !== RED.miId) j.ang = a[3];
     const hpAntes = j.hp; j.hp = a[4]; j.maxhp = a[5]; j.arma = a[6];
@@ -1994,6 +2056,8 @@ function aplicarFoto(d) {
   drones = d.dr.map(a => ({ x: a[0], y: a[1] })); torretas = d.to.map(a => ({ x: a[0], y: a[1], ang: a[2] }));
   ataques = d.at.map(a => ({ x: a[0], y: a[1], ang: a[2] })); jets = d.jt.map(a => ({ x: a[0], y: a[1], ang: a[2], k: 1 }));
   d.es.forEach((cd, i) => { if (estaciones[i]) estaciones[i].cd = cd; });
+  G.feed = (d.fd || []).map((a, i) => ({ id: a[0] + a[2] + i, quien: a[0], arma: a[1], objetivo: a[2], k: a[3] }));
+  G.alerta = d.al ? { txt: String(d.al), t: 2 } : null;
   for (const [n, v] of d.ev || []) if (typeof n === 'string') _play(n, v);
 }
 function actualizarCliente(dt) {
@@ -2011,16 +2075,46 @@ function actualizarCliente(dt) {
 }
 
 // ---------- Pantallas de multijugador ----------
+// ---------- Lluvia y relámpagos (por encima del mundo) ----------
+function dibujarLluvia() {
+  const w = cv.width, h = cv.height, t = NOW;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.strokeStyle = 'rgba(170,200,230,0.20)'; ctx.lineWidth = Math.max(1, DPR * 0.8); ctx.beginPath();
+  for (let i = 0; i < 110; i++) {
+    const sx = ((i * 7919) % 1009) / 1009, sy = ((i * 104729) % 1013) / 1013, v = 0.7 + ((i * 31) % 10) / 14;
+    const x = (((sx - t * 0.05 * v) % 1) + 1) % 1 * w, y = ((sy + t * 0.9 * v) % 1) * h;
+    ctx.moveTo(x, y); ctx.lineTo(x - 5 * DPR, y + 20 * DPR * v);
+  }
+  ctx.stroke();
+  const ciclo = t % 26;                      // un relámpago cada tanto
+  if (ciclo < 0.3) { ctx.fillStyle = `rgba(190,215,255,${0.16 * (1 - ciclo / 0.3)})`; ctx.fillRect(0, 0, w, h); }
+  ctx.restore();
+}
+
 // ---------- Puente con la interfaz (React) ----------
 // El motor publica una "foto" del estado ~15 veces por segundo; React la dibuja. React le manda órdenes con API.
 const oyentes = new Set();
 let foto = {}, fps = 60, idSeq = 0;
-export const RANGOS = ['SOLDADO', 'CABO', 'SARGENTO', 'SUBTENIENTE', 'TENIENTE', 'CAPITÁN', 'MAYOR', 'CORONEL', 'GENERAL', 'LEYENDA DEL FARO'];
-export const DATOS = { ARMAS, CAMOS, PREMIOS, NIVEL_MAX, DIFICULTADES, xpTotal, RANGOS, ZONAS: ZONAS.map(z => ({ nombre: z.nombre })), BAJAS_PARA_GANAR };
+export const DATOS = { DIFICULTADES, ZONAS: ZONAS.map(z => ({ nombre: z.nombre })), BAJAS_PARA_GANAR };
 
+const rumboA = (dx, dy) => Math.round(((Math.atan2(dy, dx) * 180 / Math.PI) + 90 + 360) % 360);   // 0 = norte (arriba), 90 = este
+function objetivoInfo(yo) {
+  let tx = null, ty = null, texto = '';
+  const masCerca = lista => { let m = null, bd = 1e9; for (const o of lista) { const d = dist(yo.x, yo.y, o.x, o.y); if (d < bd) { bd = d; m = o; } } return m; };
+  if (G.modo === 'equipos') texto = 'ELIMINÁ AL EQUIPO CONTRARIO';
+  else if (G.modo === 'tiro') { texto = 'PRACTICÁ TU PUNTERÍA EN LOS BLANCOS'; const b = masCerca(enemigos.filter(e => e.T.estatico)); if (b) { tx = b.x; ty = b.y; } }
+  else if (G.fase === 'ola') { texto = `ELIMINÁ A LOS HOSTILES (${enemigos.length + G.cola.length})`; const e = masCerca(enemigos); if (e) { tx = e.x; ty = e.y; } }
+  else if (G.fase === 'descanso' || G.fase === 'banner') texto = 'REAGRUPATE: VIENE LA PRÓXIMA OLEADA';
+  else if (G.fase === 'avanzar' && ZONAS[G.zona + 1]) { texto = 'AVANZÁ AL SIGUIENTE SECTOR'; tx = ZONAS[G.zona + 1].x0 + 40; ty = ZONAS[G.zona + 1].entrada[1]; }
+  else if (G.fase === 'defensa') { texto = 'DEFENDÉ EL FARO HASTA LA EXTRACCIÓN'; tx = FARO.x; ty = FARO.y; }
+  else if (G.fase === 'extraccion') { texto = 'LLEGÁ AL HELIPUERTO PARA ESCAPAR'; tx = PAD.x; ty = PAD.y; }
+  else if (G.fase === 'fin') texto = 'EXTRACCIÓN EN CURSO';
+  return { texto, dist: tx != null ? Math.round(dist(yo.x, yo.y, tx, ty) / 8) : null, rumbo: tx != null ? rumboA(tx - yo.x, ty - yo.y) : null, tx, ty };
+}
 function infoFase() {
   const Z = ZONAS[G.zona] || ZONAS[0];
   if (G.modo === 'equipos') return { titulo: 'DUELO POR EQUIPOS', sub: 'VERDE vs ROJO', n: null, urgente: false };
+  if (G.modo === 'tiro') return { titulo: 'CAMPO DE TIRO', sub: 'SIN ENEMIGOS // BLANCOS INFINITOS', n: null, urgente: false };
   let sub = '', urgente = false;
   const n = enemigos.length + G.cola.length;
   if (G.fase === 'ola') sub = esSup() ? `${G.modo === 'coop' ? 'COOPERATIVO' : 'SUPERVIVENCIA'} // OLEADA ${G.ola + 1}` : `OLEADA ${G.ola + 1}/${Z.oleadas.length}`;
@@ -2037,23 +2131,30 @@ function datosFin() {
   const rango = G.pts > 30000 ? 'LEYENDA DEL FARO' : G.pts > 22000 ? 'CAPITÁN' : G.pts > 15000 ? 'SARGENTO' : 'SOLDADO';
   const tabla = MP() ? [...jugadores].sort((a, b) => (b.bajas || 0) - (a.bajas || 0)).map(j => ({ nombre: j.nombre, equipo: j.equipo, bajas: j.bajas || 0, muertes: j.muertes || 0, yo: j === YO })) : [];
   return { sup: esSup(), olasSup: G.olasSup || 0, recordSup, pts: G.pts, bajas: G.bajas, prec, tiempo: Math.floor(G.tiempo), dificultad: dif().nombre, rango,
-    xpPartida: G.xpPartida || 0, nuevoRecord: !!G.nuevoRecord, record, zona: G.zona + 1, tabla, ganador: G.ganador || '', marc: G.marc || { verde: 0, rojo: 0 },
+    xpPartida: G.xpPartida || 0, creditos: G.creditosGanados || 0, nuevoRecord: !!G.nuevoRecord, record, zona: G.zona + 1, tabla, ganador: G.ganador || '', marc: G.marc || { verde: 0, rojo: 0 },
     t: G.estado === 'victoria' || G.estado === 'finEq' ? G.ganoT : G.muerteT };
 }
 function tomarFoto() {
   const yo = (MP() && YO) ? YO : P;
   const nv = nivelActual(), menu = enMenu();
-  const w = ARMAS[yo.arma] || ARMAS[1];
+  const w = (yo.W && yo.W[yo.arma]) || ARMAS[yo.arma] || ARMAS[1], base = ARMAS[yo.arma] || ARMAS[1];
   const caja = !menu && !yo.muerto ? estaciones.find(e => dist(yo.x, yo.y, e.x, e.y) < 30) : null;
-  const save = leerPartida();
+  const save = leerPartida(), op = OPERADOR_POR_ID(yo.op);
   G.toasts.forEach(t => { if (!t.id) t.id = ++idSeq; });
   if (G.banner && !G.banner.id) G.banner.id = ++idSeq;
   if (G.radio && !G.radio.id) G.radio.id = ++idSeq;
+  const yoHp = Math.max(0, Math.ceil(yo.hp));
+  const escuadron = menu ? [] : MP()
+    ? jugadores.map(j => ({ nombre: j.nombre, hp: Math.max(0, Math.ceil(j.hp)), maxhp: j.maxhp, muerto: !!j.muerto, yo: j === YO, equipo: j.equipo, bot: !!j.bot }))
+    : [{ nombre: miNombre(), hp: yoHp, maxhp: yo.maxhp, muerto: false, yo: true, equipo: 'verde', bot: false }];
   return {
     estado: G.estado, modo: G.modo, fase: G.fase, mp: MP(), cargando: MP() && !YO, pausaLocal: !!G.pausaLocal, tiempo: G.tiempo, fps: Math.round(fps),
-    info: menu ? null : infoFase(), pts: G.pts, bajas: G.bajas,
-    nivel: nv, xp: PERFIL.xp, xpIni: xpTotal(nv), xpSig: nv >= NIVEL_MAX ? null : xpTotal(nv + 1), rango: RANGOS[clamp(nv - 1, 0, RANGOS.length - 1)],
-    hp: Math.max(0, Math.ceil(yo.hp)), maxhp: yo.maxhp, arma: yo.arma, armaNombre: w.nombre, cargador: w.cargador,
+    info: menu ? null : infoFase(), obj: menu ? null : objetivoInfo(yo), pts: G.pts, bajas: G.bajas,
+    nivel: nv, xp: PERFIL.xp, xpIni: xpTotal(nv), xpSig: nv >= NIVEL_MAX ? null : xpTotal(nv + 1), rango: rangoDe(nv),
+    rumbo: Math.round(((yo.ang * 180 / Math.PI) + 90 + 360) % 360), enemigos: enemigos.length, cola: G.cola.length,
+    hp: yoHp, maxhp: yo.maxhp, arma: yo.arma, armaNombre: w.nombre, cargador: w.cargador,
+    armaInfo: { nombre: base.nombre, clase: base.clase, calibre: base.calibre, modo: base.modo, sil: !!w.sil, cargador: w.cargador },
+    op: { nombre: op.n, rol: op.rol },
     mun: (yo.mun || []).map(m => ({ c: m.c, res: m.res === Infinity ? -1 : m.res })), gran: yo.gran,
     recargando: yo.recarga > 0, recProg: yo.recarga > 0 ? 1 - yo.recarga / w.recarga : 0,
     racha: G.racha, S: { dron: !!S.dron, aereo: !!S.aereo, torreta: !!S.torreta },
@@ -2062,25 +2163,59 @@ function tomarFoto() {
     banner: G.banner ? { id: G.banner.id, t: G.banner.t, sub: G.banner.sub, k: G.banner.k, dur: G.banner.dur } : null,
     radio: G.radio ? { id: G.radio.id, quien: G.radio.quien, txt: G.radio.txt, k: G.radio.k, dur: G.radio.dur } : null,
     toasts: G.toasts.map(t => ({ id: t.id, txt: t.txt, color: t.color, k: t.k })),
+    feed: G.feed.map(f => ({ id: f.id, quien: f.quien, arma: f.arma, objetivo: f.objetivo, k: f.k })), alerta: G.alerta ? G.alerta.txt : '',
+    escuadron, tiro: G.modo === 'tiro' ? { disparos: G.disparos, aciertos: G.aciertos, danio: Math.round(G.danioTiro || 0), t: G.tiempo } : null,
     jefe: G.jefe && !G.jefe.muerto ? { hp: G.jefe.hp, maxhp: G.jefe.maxhp } : null,
     eq: { verde: G.marc ? G.marc.verde : 0, rojo: G.marc ? G.marc.rojo : 0, tiempo: Math.max(0, Math.ceil(G.tiempoEq || 0)), mio: YO ? YO.equipo : 'verde' },
     tienda: { creditos: G.estado === 'tienda' || G.compras ? creditos() : 0, items: TIENDA.map(it => ({ id: it.id, n: it.n, d: it.d, p: it.p, max: it.max || 0, veces: (G.compras || {})[it.id] || 0 })) },
     fin: ['muerto', 'victoria', 'finEq'].includes(G.estado) ? datosFin() : null,
     red: { activo: RED.activo, host: RED.host, cliente: RED.cliente, estado: RED.estado, error: RED.error, codigo: RED.codigo, link: RED.codigo ? linkSala() : '',
       sala: RED.sala.map(s => ({ ...s })), salaModo: RED.salaModo, bots: RED.bots, miId: RED.miId, invitacion: salaURL },
-    perfil: { nombre: miNombre(), camo: PERFIL.camo, record, recordSup, dif: difIdx, stats: { ...PERFIL.stats }, partida: save ? { zona: save.zona + 1, pts: save.pts } : null },
+    perfil: { nombre: miNombre(), record, recordSup, dif: difIdx, partida: save ? { zona: save.zona + 1, pts: save.pts } : null },
     touch: touch.activo, mute: Snd.mute, aviso: G.aviso || '',
   };
 }
 function publicar() { foto = tomarFoto(); for (const f of oyentes) f(); }
 export const store = { suscribir: f => { oyentes.add(f); return () => oyentes.delete(f); }, foto: () => foto };
 
-// Dibuja un soldado con su camuflaje en un <canvas> chiquito (vista previa en OPERADORES)
-function previewSoldado(canvas, camoIdx, armaIdx = 1) {
-  const g = canvas.getContext('2d'), c = CAMOS[camoIdx] || CAMOS[0];
+// Dibuja un soldado con su paleta en un <canvas> chiquito (vista previa de operadores y camuflajes)
+function previewSoldado(canvas, paleta, armaIdx = 1) {
+  const g = canvas.getContext('2d'), c = paleta || CAMOS[0];
   g.clearRect(0, 0, canvas.width, canvas.height); g.imageSmoothingEnabled = false;
-  g.save(); g.scale(canvas.width / 24, canvas.height / 24);
-  dibujarSoldado(g, 12, 12, -0.5, 6, c.c, c.h, armaIdx === 2 ? 10 : armaIdx === 1 ? 9 : 5, false, 0);
+  g.save(); g.scale(canvas.width / 17, canvas.height / 17);
+  dibujarSoldado(g, 8.5, 8.5, -0.5, 6, c.c, c.h, armaIdx === 2 ? 10 : armaIdx === 1 ? 9 : 5, false, 0);
+  g.restore();
+}
+
+// Radar circular (arriba a la izquierda): muestra lo que hay cerca, con el norte arriba
+let radarCv = null;
+function dibujarRadar() {
+  const c = radarCv; if (!c || !c.isConnected) return;
+  const g = c.getContext('2d'), w = c.width, R = w / 2, yo = (MP() && YO) ? YO : P, ALC = 460, k = (R - 6) / ALC;
+  g.clearRect(0, 0, w, w); g.save(); g.beginPath(); g.arc(R, R, R - 2, 0, 7); g.clip();
+  g.fillStyle = 'rgba(2,12,9,0.6)'; g.fillRect(0, 0, w, w);
+  g.strokeStyle = 'rgba(16,185,129,0.25)'; g.lineWidth = 1;
+  for (const f of [0.34, 0.67, 1]) { g.beginPath(); g.arc(R, R, (R - 6) * f, 0, 7); g.stroke(); }
+  g.beginPath(); g.moveTo(R, 4); g.lineTo(R, w - 4); g.moveTo(4, R); g.lineTo(w - 4, R); g.stroke();
+  g.fillStyle = 'rgba(16,185,129,0.15)'; g.beginPath(); g.moveTo(R, R); g.arc(R, R, R - 6, yo.ang - 0.5, yo.ang + 0.5); g.closePath(); g.fill();   // hacia dónde mirás
+  const pt = (x, y) => ({ x: R + (x - yo.x) * k, y: R + (y - yo.y) * k });
+  for (const e of enemigos) {
+    if (e.muerto || dist(e.x, e.y, yo.x, yo.y) > ALC) continue;
+    const p = pt(e.x, e.y); g.fillStyle = e.T.estatico ? '#fbbf24' : '#ef4444';
+    g.beginPath(); g.arc(p.x, p.y, e.T.sniper || e.T.jefe ? 3.6 : 2.6, 0, 7); g.fill();
+  }
+  if (MP()) jugadores.forEach((j, i) => {
+    if (j === YO || j.muerto || (G.modo === 'equipos' && j.equipo !== YO.equipo) || dist(j.x, j.y, yo.x, yo.y) > ALC) return;
+    const p = pt(j.x, j.y); g.fillStyle = '#34d399'; g.beginPath(); g.arc(p.x, p.y, 4, 0, 7); g.fill();
+    g.fillStyle = '#04120c'; g.font = 'bold 6px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(i + 1), p.x, p.y + 0.5);
+  });
+  const o = objetivoInfo(yo);
+  if (o.tx != null && G.modo !== 'tiro' && G.fase !== 'ola') {
+    const dx = o.tx - yo.x, dy = o.ty - yo.y, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+    const rr = d > ALC ? R - 10 : d * k, px = R + Math.cos(a) * rr, py = R + Math.sin(a) * rr;
+    g.fillStyle = '#fbbf24'; g.beginPath(); g.moveTo(px, py - 5); g.lineTo(px + 4, py); g.lineTo(px, py + 5); g.lineTo(px - 4, py); g.closePath(); g.fill();
+  }
+  g.fillStyle = '#10b981'; g.save(); g.translate(R, R); g.rotate(yo.ang); g.beginPath(); g.moveTo(6, 0); g.lineTo(-4, -4); g.lineTo(-2, 0); g.lineTo(-4, 4); g.closePath(); g.fill(); g.restore();
   g.restore();
 }
 
@@ -2089,6 +2224,7 @@ export const API = {
   jugarCampania() { if (RED.activo) salirRed(); iniciarJuego(); publicar(); },
   continuar() { if (RED.activo) salirRed(); continuarPartida(); publicar(); },
   jugarSupervivencia() { if (RED.activo) salirRed(); iniciarSupervivencia(); publicar(); },
+  jugarTiro() { if (RED.activo) salirRed(); iniciarTiro(); publicar(); },
   // El anfitrión vuelve a la sala de espera sin cerrar la sala
   volverSala() {
     if (!RED.host) return;
@@ -2099,7 +2235,7 @@ export const API = {
   unirseSala(c) { unirseSala(c); publicar(); },
   empezar() { empezarMP(); publicar(); },
   salir() { if (RED.activo) salirRed(); else irTitulo(); publicar(); },
-  reintentar() { if (MP()) { if (RED.host) empezarMP(); } else reintentar(); publicar(); },
+  reintentar() { if (MP()) { if (RED.host) empezarMP(); } else if (G.modo === 'tiro') iniciarTiro(); else reintentar(); publicar(); },
   setModoSala(m) {
     if (!RED.host) return; RED.salaModo = m;
     if (m === 'coop') RED.sala.forEach(s => { s.equipo = 'verde'; }); else RED.sala.forEach((s, i) => { s.equipo = i % 2 ? 'rojo' : 'verde'; });
@@ -2113,10 +2249,6 @@ export const API = {
   comprar(id) { const it = TIENDA.find(o => o.id === id); if (it && G.estado === 'tienda') { comprar(it); publicar(); } },
   cerrarTienda() { if (G.estado === 'tienda') { G.estado = 'jugando'; publicar(); } },
   setDificultad(i) { difIdx = clamp(i, 0, 2); try { localStorage.setItem('faro_dif', difIdx); } catch (e) {} publicar(); },
-  setCamo(i) {
-    if (!CAMOS[i] || CAMOS[i].nivel > nivelActual()) return;
-    PERFIL.camo = i; guardarPerfil(); if (RED.host && RED.sala[0]) RED.sala[0].camo = i; publicar();
-  },
   setNombre(n) {
     n = limpiarNombre(n); try { localStorage.setItem('faro_nombre', n); } catch (e) {}
     if (RED.host && RED.sala[0]) RED.sala[0].nombre = n;
@@ -2127,8 +2259,12 @@ export const API = {
   audio() { Snd.init(); },
   click() { Snd.play('click'); },
   registrarMinimapa(el) { miniCv = el; },
+  registrarRadar(el) { radarCv = el; },
   previewSoldado,
 };
+
+// Si el jugador cambia de operador, camuflaje o accesorios, la sala se entera
+suscribirPerfil(() => { if (RED.host && RED.sala[0]) Object.assign(RED.sala[0], equipoLocalSala()); publicar(); });
 
 // ---------- Arranque ----------
 construirMapa(); pintarMundo();
@@ -2143,7 +2279,7 @@ function loop(ahora) {
   const menu = enMenu();
   if (!menu) render();                      // en los menús la interfaz tapa el mundo: no gastamos batería dibujándolo
   fotoT -= dt; if (fotoT <= 0) { fotoT = menu ? 0.5 : 0.066; publicar(); }
-  miniT -= dt; if (!menu && miniT <= 0) { miniT = 0.1; dibujarMinimapa(); }
+  miniT -= dt; if (!menu && miniT <= 0) { miniT = 0.1; dibujarMinimapa(); dibujarRadar(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -2154,7 +2290,7 @@ if (/[?&]debug/.test(location.search)) {
   window.__juego = {
     get G() { return G; }, get P() { return P; }, get YO() { return YO; }, get jugadores() { return jugadores; }, get enemigos() { return enemigos; },
     get heli() { return heli; }, get RED() { return RED; }, get PERFIL() { return PERFIL; }, get portones() { return portones; }, get ZONAS() { return ZONAS; },
-    mouse, teclas, touch, TIENDA, PAD, actualizar, render, golpearEnemigo, crearEnemigo, hayVision, asistirMira, empezarMP, iniciarJuego, iniciarSupervivencia,
-    publicar, tomarFoto, tirarGranada, usarRacha, herirJugador, redTick, API,
+    mouse, teclas, touch, TIENDA, PAD, actualizar, render, golpearEnemigo, crearEnemigo, hayVision, asistirMira, empezarMP, iniciarJuego, iniciarSupervivencia, iniciarTiro,
+    publicar, tomarFoto, tirarGranada, usarRacha, herirJugador, redTick, API, nuevoJugador, statsArma,
   };
 }

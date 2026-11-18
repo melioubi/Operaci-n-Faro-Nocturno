@@ -10,6 +10,8 @@ export default {
     extend: {
       screens: { short: { raw: '(max-height: 520px)' }, tactil: { raw: '(pointer: coarse)' } },
       colors: {
+        nvg: { 300: '#86efac', 400: '#4ade80', 500: '#10b981', 600: '#059669' },
+        tactical: { amber: '#f59e0b', amberGlow: '#fbbf24', armor: '#38bdf8', threat: '#ef4444' },
         'surface-tint': '#ffb95f', background: '#101419', primary: '#ffc174', 'tertiary-fixed': '#acedff', 'on-background': '#e0e2ea',
         'secondary-fixed': '#6bff8f', 'on-tertiary': '#003640', tertiary: '#54ddfc', 'surface-bright': '#36393f', error: '#ffb4ab',
         'inverse-primary': '#855300', 'primary-container': '#f59e0b', 'on-secondary': '#003915', 'on-error-container': '#ffdad6',
@@ -29,6 +31,7 @@ export default {
         'space-xl': '2rem', 'margin-desktop': '2.5rem', 'space-lg': '1.5rem',
       },
       fontFamily: {
+        tactical: ['Rajdhani', 'sans-serif'], mono: ['Chivo Mono', 'monospace'],
         'body-md': ['Hanken Grotesk', 'sans-serif'], 'headline-xl-mobile': ['Chivo', 'sans-serif'], 'body-sm': ['Hanken Grotesk', 'sans-serif'],
         'label-lg': ['Chivo', 'sans-serif'], 'headline-xl': ['Chivo', 'sans-serif'], 'headline-lg': ['Chivo', 'sans-serif'],
         'label-sm': ['Chivo', 'sans-serif'], 'headline-md': ['Chivo', 'sans-serif'], 'label-md': ['Chivo', 'sans-serif'],
