@@ -399,11 +399,15 @@ function capsulaHumana() {
 
 function asegurarHumano(figura, clave, alto) {
   const humano = figura.userData.humano;
-  if (humano.userData.clave === clave) return;
+  const real = modeloListo(clave);
+  if (humano.userData.clave === clave && humano.userData.real === real) return;
   vaciarGrupo(humano);
   const modelo = tomarModelo(clave, alto);
-  if (modelo) humano.add(modelo);
-  else {
+  if (modelo) {
+    humano.add(modelo);
+    figura.userData.cuerpo = null;
+    figura.userData.casco = null;
+  } else {
     const capsula = capsulaHumana();
     humano.add(capsula);
     figura.userData.cuerpo = capsula.userData.cuerpo;
@@ -413,12 +417,14 @@ function asegurarHumano(figura, clave, alto) {
   arma.position.set(0.28, alto * 0.58, 0.16);
   humano.add(arma);
   humano.userData.clave = clave;
+  humano.userData.real = !!modelo;
   figura.userData.arma = arma;
 }
 
 function asegurarPerro(figura) {
   const perro = figura.userData.perro;
-  if (perro.userData.listo) return;
+  const real = modeloListo('perro');
+  if (perro.userData.listo && perro.userData.real === real) return;
   vaciarGrupo(perro);
   const modelo = tomarModelo('perro', 1.45);
   if (modelo) perro.add(modelo);
@@ -430,6 +436,7 @@ function asegurarPerro(figura) {
     perro.add(cuerpo);
   }
   perro.userData.listo = true;
+  perro.userData.real = !!modelo;
 }
 
 function crearFigura() {
@@ -456,6 +463,7 @@ function crearHeli() {
   const modelo = tomarModelo('heli', 6.2);
   const rotor = caja(0.08, 0.04, 3.4, 0xdddddd);
   rotor.position.y = modelo ? 1.7 : 0.5;
+  g.userData.real = !!modelo;
   if (modelo) g.add(modelo);
   else {
     const cuerpo = caja(1.6, 0.7, 2.4, 0x3e5236);
@@ -490,6 +498,7 @@ function ponerArma(grupo, tipo, colores, acc) {
   const acento = colores.acento || '#c8a060';
   const largo = tipo === 0 ? 0.42 : tipo === 2 ? 0.62 : 0.72;
   const modelo = tomarModelo(ARMA_CLAVE[tipo] || 'fusil', largo);
+  grupo.userData.real = !!modelo;
   if (modelo) {
     grupo.add(modelo);
     const flash = caja(0.05, 0.05, 0.05, 0xfff2b0, { emissive: 0xffcc66, emissiveIntensity: 2 });
@@ -547,8 +556,10 @@ function claveArma(tipo, colores, acc) {
 }
 
 function sincronizarArma(grupo, tipo, colores, acc) {
+  if (!grupo) return;
   const clave = claveArma(tipo, colores, acc);
-  if (grupo.userData.clave === clave) return;
+  const real = modeloListo(ARMA_CLAVE[tipo] || 'fusil');
+  if (grupo.userData.clave === clave && !!grupo.userData.real === real) return;
   vaciarGrupo(grupo);
   ponerArma(grupo, tipo, colores, acc);
   grupo.userData.clave = clave;
@@ -725,6 +736,26 @@ function actualizarClima(datos, dt) {
   luna.target.position.set(aX(datos.yo.x), 0, aZ(datos.yo.y));
 }
 
+const CLAVES_MAPA = ['cabana', 'faroTorre', 'madera', 'metal', 'tala', 'restos', 'centinela', 'ruinas'];
+
+function selloMapa() {
+  let sello = '';
+  for (const clave of CLAVES_MAPA) sello += modeloListo(clave) ? '1' : '0';
+  return sello;
+}
+
+function asegurarHeli() {
+  const real = modeloListo('heli');
+  if (!heliMesh || !!heliMesh.userData.real === real) return;
+  const visible = heliMesh.visible;
+  const pos = heliMesh.position.clone();
+  scene.remove(heliMesh);
+  heliMesh = crearHeli();
+  heliMesh.visible = visible;
+  heliMesh.position.copy(pos);
+  scene.add(heliMesh);
+}
+
 export function ocultarMundo() {
   if (canvas) canvas.style.display = 'none';
   const plano = document.getElementById('c');
@@ -737,7 +768,9 @@ export function renderMundo(datos) {
   const plano = document.getElementById('c');
   if (plano) plano.classList.add('sobre-3d');
   if (datos.calidad !== calAplicada) aplicarCalidad(datos.calidad);
-  if (datos.mapaId !== mapaHecho) construir(datos.obstaculos, datos.mapaId);
+  const firma = `${datos.mapaId}:${selloMapa()}`;
+  if (firma !== mapaHecho) construir(datos.obstaculos, firma);
+  asegurarHeli();
   reloj.update();
   const crudo = reloj.getDelta();
   const dt = Math.min(crudo, 0.05);

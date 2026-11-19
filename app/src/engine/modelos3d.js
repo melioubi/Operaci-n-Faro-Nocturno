@@ -128,8 +128,12 @@ export function cargarModelos(alTerminar) {
   };
   for (const clave of claves) {
     loader.load(ruta(ARCHIVOS[clave]), (gltf) => {
-      listos[clave] = ajustar(gltf.scene, MODO[clave]);
-      if (clave === 'hielo') listos.enemigo = listos.hielo;
+      try {
+        listos[clave] = ajustar(gltf.scene, MODO[clave]);
+        if (clave === 'hielo') listos.enemigo = listos.hielo;
+      } catch (err) {
+        console.error('No se pudo preparar', clave, err);
+      }
       cerrar();
     }, undefined, (err) => {
       console.error('No se pudo cargar', clave, err);
