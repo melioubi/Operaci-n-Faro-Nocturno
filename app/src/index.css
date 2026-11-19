@@ -46,3 +46,5 @@
 @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 .anim-ticker { animation: ticker 40s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .anim-ticker { animation: none; } }
+
+#vineta3d { position: fixed; inset: 0; pointer-events: none; z-index: 0; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(2,6,14,0.55) 100%), linear-gradient(rgba(10,30,50,0.10), rgba(10,30,50,0.10)); mix-blend-mode: multiply; }

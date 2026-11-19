@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { textura, conRepeticion, crearCielo, crearHazVisible } from './texturas3d.js';
 import { cargarModelos, claveOperador, mapaDe, modeloListo, tomarModelo } from './modelos3d.js';
 
 // Campo 3D de la campaña. El combate sigue en el mapa 2D; esta capa lo muestra
@@ -44,6 +45,11 @@ let armaMano = null;
 let armaClave = '';
 let heliMesh = null;
 let luzBoca = null;
+let cielo = null;
+let hazVis = null;
+let escalaDin = 1;
+let ema = 0.0167;
+let ajusteT = 0;
 const figuras = [];
 const trazas = [];
 const granadasMesh = [];
@@ -111,17 +117,26 @@ function boot() {
   if (!renderer.getContext()) { fallo = true; return false; }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 1.05;
   renderer.setPixelRatio(1);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a2430);
   scene.fog = new THREE.FogExp2(0x1a2430, 0.02);
+  cielo = crearCielo();
+  scene.add(cielo);
+  hazVis = crearHazVisible();
+  scene.add(hazVis);
+  if (!document.getElementById('vineta3d')) {
+    const v = document.createElement('div');
+    v.id = 'vineta3d';
+    canvas.insertAdjacentElement('afterend', v);
+  }
   camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.08, 220);
   scene.add(camera);
-  ambiente = new THREE.HemisphereLight(0x8aa4c8, 0x243018, 2.4);
+  ambiente = new THREE.HemisphereLight(0x7f9cc8, 0x1c2814, 1.8);
   scene.add(new THREE.AmbientLight(0x243044, 1.1));
-  luna = new THREE.DirectionalLight(0xd0def0, 6);
+  luna = new THREE.DirectionalLight(0xb4c8ff, 6.5);
   luna.position.set(-30, 48, 18);
   scene.add(ambiente, luna, luna.target);
   haz = new THREE.SpotLight(0xfff1c4, 180, 90, 0.22, 0.45, 1.2);
@@ -165,7 +180,7 @@ function alRedimensionar() {
   const w = window.innerWidth, h = window.innerHeight;
   camera.aspect = w / Math.max(1, h);
   camera.updateProjectionMatrix();
-  const px = calAplicada === 'alta' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1;
+  const px = (calAplicada === 'alta' ? Math.min(window.devicePixelRatio || 1, 1.5) : 1) * escalaDin;
   renderer.setPixelRatio(px);
   renderer.setSize(w, h, false);
 }
@@ -261,7 +276,10 @@ function construir(obstaculos, id) {
   CAMPOS.forEach((z, i) => {
     const ancho = 900 * ESCALA;
     const fondo = 900 * ESCALA;
-    const suelo = new THREE.Mesh(new THREE.PlaneGeometry(ancho, fondo), material(z.suelo, { roughness: 1, metalness: 0 }));
+    const tex = conRepeticion(['pasto', 'bosque', 'arena', 'grava'][i] || 'pasto', ancho / 3, fondo / 3);
+    const mat = material(0xffffff, { map: tex, bumpMap: tex, bumpScale: 1.6, roughness: 0.62, metalness: 0 });
+    mat.userData.mapaClon = true;
+    const suelo = new THREE.Mesh(new THREE.PlaneGeometry(ancho, fondo), mat);
     suelo.rotation.x = -Math.PI / 2;
     suelo.position.set(aX(i * 900 + 450), 0, aZ(450));
     suelo.receiveShadow = alta;
@@ -286,7 +304,13 @@ function construir(obstaculos, id) {
     } else if (ALTURA[o.tipo]) {
       const alto = ALTURA[o.tipo];
       const clave = (o.tipo === 'caja' || o.tipo === 'tronco') ? 'madera' : (o.tipo === 'bolsas' || o.tipo === 'municion' || o.tipo === 'bote') ? 'metal' : null;
-      const mat = clave ? materialConMapa(COLOR_TIPO[o.tipo] || 0x888888, clave, 1, 1, { roughness: 0.8 }) : material(COLOR_TIPO[o.tipo] || 0x888888);
+      let mat = clave ? materialConMapa(COLOR_TIPO[o.tipo] || 0x888888, clave, 1, 1, { roughness: 0.8 }) : material(COLOR_TIPO[o.tipo] || 0x888888);
+      if (o.tipo === 'pared') {
+        const rep = Math.max(1, Math.max(o.w, o.h) * ESCALA / 2.5);
+        const tx = conRepeticion('yeso', rep, Math.max(1, alto / 2.5));
+        mat = material(0xffffff, { map: tx, bumpMap: tx, bumpScale: 1.2, roughness: 0.92 });
+        mat.userData.mapaClon = true;
+      }
       const m = new THREE.Mesh(CUBO, mat);
       m.scale.set(Math.max(0.08, o.w * ESCALA), alto, Math.max(0.08, o.h * ESCALA));
       m.position.set(aX(o.x + o.w / 2), alto / 2, aZ(o.y + o.h / 2));
@@ -313,7 +337,7 @@ function construir(obstaculos, id) {
   for (const [clave, x, y, medida, giro] of hitos) {
     if (modeloListo(clave)) ponerProp(clave, x, y, medida, giro);
   }
-  const troncos = instancias(arboles, GEO_TRONCO, material(0x4a3a28), (d, o) => {
+  const troncos = instancias(arboles, GEO_TRONCO, material(0xffffff, { map: textura('corteza'), roughness: 0.95 }), (d, o) => {
     d.position.set(aX(o.x + o.w / 2), 1.15, aZ(o.y + o.h / 2));
     d.scale.set(o.w * ESCALA * 0.45, 2.3, o.h * ESCALA * 0.45);
   });
@@ -322,7 +346,7 @@ function construir(obstaculos, id) {
     d.position.set(aX(o.x + o.w / 2), 2.7, aZ(o.y + o.h / 2));
     d.scale.set(r, r * 0.85, r);
   });
-  const piedras = instancias(rocas, GEO_ROCA, material(0x7a8088, { roughness: 0.95 }), (d, o) => {
+  const piedras = instancias(rocas, GEO_ROCA, material(0xffffff, { map: textura('roca'), bumpMap: textura('roca'), bumpScale: 2, roughness: 0.8 }), (d, o) => {
     d.position.set(aX(o.x + o.w / 2), o.h * ESCALA * 0.35, aZ(o.y + o.h / 2));
     d.scale.set(o.w * ESCALA, o.h * ESCALA * 0.7, o.h * ESCALA);
     d.rotation.y = (o.x % 7) * 0.4;
@@ -686,8 +710,8 @@ function actualizarClima(datos, dt) {
   scene.background.copy(scene.fog.color);
   if (Math.random() < dt * 0.05) rayoT = 0.1;
   if (rayoT > 0) { rayoT -= dt; ambiente.intensity = 4.2; }
-  else ambiente.intensity = datos.nvg ? 3.2 : 2.4;
-  renderer.toneMappingExposure = datos.nvg ? 1.55 : 1.2;
+  else ambiente.intensity = datos.nvg ? 3.0 : 1.8;
+  renderer.toneMappingExposure = datos.nvg ? 1.5 : 1.05;
   const t = performance.now() * 0.00035;
   const fx = Math.cos(t), fz = Math.sin(t);
   haz.target.position.set(haz.position.x + fx * 36, 1.2, haz.position.z + fz * 36);
@@ -715,13 +739,24 @@ export function renderMundo(datos) {
   if (datos.calidad !== calAplicada) aplicarCalidad(datos.calidad);
   if (datos.mapaId !== mapaHecho) construir(datos.obstaculos, datos.mapaId);
   reloj.update();
-  const dt = Math.min(reloj.getDelta(), 0.05);
+  const crudo = reloj.getDelta();
+  const dt = Math.min(crudo, 0.05);
+  ema = ema * 0.94 + Math.min(crudo, 0.25) * 0.06;
+  ajusteT += dt;
+  if (ajusteT > 1.5) {
+    ajusteT = 0;
+    if (ema > 0.024 && escalaDin > 0.55) { escalaDin = Math.max(0.55, escalaDin - 0.1); alRedimensionar(); }
+    else if (ema < 0.0185 && escalaDin < 1) { escalaDin = Math.min(1, escalaDin + 0.05); alRedimensionar(); }
+  }
   actualizarClima(datos, dt);
   actualizarJugador(datos);
   actualizarOtros(datos);
   actualizarProyectiles(datos);
   actualizarCamara(datos, dt);
   actualizarLluvia(aX(datos.yo.x), aZ(datos.yo.y), dt);
+  cielo.position.copy(camera.position);
+  hazVis.position.copy(haz.position);
+  hazVis.lookAt(haz.target.position);
   renderer.render(scene, camera);
   void armaClave;
   return true;
