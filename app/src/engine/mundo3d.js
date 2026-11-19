@@ -450,6 +450,21 @@ function asegurarPerro(figura) {
   perro.userData.real = !!modelo;
 }
 
+let matSombra = null;
+// Mancha oscura bajo los pies: da la sensación de estar parado sobre el suelo
+function sombraSuelo() {
+  if (!matSombra) {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(0,0,0,0.75)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    matSombra = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, fog: false });
+  }
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), matSombra);
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.025; m.renderOrder = 1; m.userData.basico = true;
+  return m;
+}
+
 function crearFigura() {
   const g = new THREE.Group();
   const humano = new THREE.Group();
@@ -463,7 +478,9 @@ function crearFigura() {
   aro.position.y = 1.2;
   aro.userData.basico = true;
   blanco.add(aro);
-  g.add(humano, perro, blanco);
+  humano.position.y = 0.06;
+  perro.position.y = 0.04;
+  g.add(sombraSuelo(), humano, perro, blanco);
   g.userData = { humano, perro, blanco, arma: null, cuerpo: null, casco: null };
   asegurarHumano(g, 'faro', ALTO_PERSONA);
   return g;
