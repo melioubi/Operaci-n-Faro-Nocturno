@@ -246,6 +246,17 @@ function Arma({ f }) {
     </article>
   );
 }
+function BotonDisparo() {
+  const soltar = () => API.setDisparo(false);
+  return (
+    <button type="button" aria-label="Disparar"
+      onPointerDown={e => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); API.setDisparo(true); }}
+      onPointerUp={soltar} onPointerCancel={soltar}
+      className="pointer-events-auto absolute right-[max(1rem,env(safe-area-inset-right))] bottom-[46%] z-10 w-16 h-16 short:w-14 short:h-14 rounded-full border-2 border-red-300 bg-red-950/85 text-white font-mono text-[11px] font-bold tracking-wider select-none touch-none active:scale-95 active:bg-red-700">
+      FUEGO
+    </button>
+  );
+}
 function BotonesTactiles({ f }) {
   const m = f.mun[f.arma] || { c: 0, res: 0 };
   const lista = [
@@ -305,7 +316,7 @@ function Mensajes({ f }) {
           </section>
         )}
         {f.tiempo < 14 && f.estado === 'jugando' && !f.muerto && (
-          <div className="bg-black/70 rounded px-3 py-1 font-mono text-[11px] text-tactical-amber text-center">{tc ? 'Pulgar IZQUIERDO = caminar · Pulgar DERECHO = apuntar y disparar' : 'R = RECARGAR · 1 2 3 o Q = CAMBIAR ARMA · G = GRANADA'}</div>
+          <div className="bg-black/70 rounded px-3 py-1 font-mono text-[11px] text-tactical-amber text-center">{tc ? ((f.camara === 'primera' || f.camara === 'tercera') ? 'IZQUIERDA = caminar · DERECHA = mover la mira · FUEGO = disparar' : 'Pulgar IZQUIERDO = caminar · Pulgar DERECHO = apuntar y disparar') : 'R = RECARGAR · 1 2 3 o Q = CAMBIAR ARMA · G = GRANADA'}</div>
         )}
       </div>
     </>
@@ -315,7 +326,13 @@ function Mensajes({ f }) {
 export default function Hud({ f }) {
   const [nvg, setNvg] = useState(false);
   // La visión nocturna se aplica al mundo (el canvas) y se activa también con la tecla N
-  useEffect(() => { const c = document.getElementById('c'); if (c) c.classList.toggle('nvg-activo', nvg); return () => { if (c) c.classList.remove('nvg-activo'); }; }, [nvg]);
+  useEffect(() => {
+    const c = document.getElementById('c');
+    const c3 = document.getElementById('c3d');
+    if (c) c.classList.toggle('nvg-activo', nvg);
+    if (c3) c3.classList.toggle('nvg-activo', nvg);
+    return () => { if (c) c.classList.remove('nvg-activo'); if (c3) c3.classList.remove('nvg-activo'); };
+  }, [nvg]);
   useEffect(() => {
     const al = e => { if (/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) return; if (e.key === 'n' || e.key === 'N') setNvg(v => !v); };
     addEventListener('keydown', al); return () => removeEventListener('keydown', al);
@@ -338,6 +355,7 @@ export default function Hud({ f }) {
         </div>
       </footer>
       <Mensajes f={f} />
+      {tc && (f.camara === 'primera' || f.camara === 'tercera') && <BotonDisparo />}
       {f.mp && f.muerto && f.estado === 'jugando' && (
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-black/75 backdrop-blur-md py-3 text-center">
           <div className="font-tactical font-bold text-5xl text-red-400 uppercase tracking-widest">CAÍSTE</div>

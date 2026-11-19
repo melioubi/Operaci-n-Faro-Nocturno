@@ -40,10 +40,12 @@ export const AYUDA = [
   { t: 'CONTROLES EN COMPU', i: 'gamepad', teclas: [
     ['W A S D / FLECHAS', 'Caminar'], ['SHIFT', 'Correr'], ['MOUSE', 'Apuntar'], ['CLICK', 'Disparar'], ['R', 'Recargar'],
     ['1 2 3 / Q / RUEDITA', 'Cambiar de arma'], ['G / CLICK DERECHO', 'Tirar granada'], ['E', 'Caja de munición (cerca de la caja)'],
-    ['Z / X / C', 'Dron / Ataque aéreo / Torreta'], ['V', 'Cambiar de vista (arriba 2.5D / tercera / primera / clásica)'], ['PRIMERA Y TERCERA', 'Clic en el juego captura el mouse: movés el mouse para mirar. W A S D caminan hacia donde mirás. Flechas izq/der también giran'], ['ESC / P', 'Pausa'], ['M', 'Sonido'],
+    ['Z / X / C', 'Dron / Ataque aéreo / Torreta'], ['V', 'Cambiar de vista (arriba 2.5D / tercera / primera / clásica)'], ['PRIMERA Y TERCERA', 'Clic en el juego captura el mouse: movés el mouse para mirar y el clic izquierdo dispara. La sensibilidad se ajusta en AJUSTES'], ['ESC / P', 'Pausa'], ['M', 'Sonido'],
   ] },
   { t: 'CONTROLES EN CELULAR', i: 'my_location', nota: 'Poné el celular acostado y usá los dos pulgares a la vez.', teclas: [
-    ['JOYSTICK IZQUIERDO', 'Arrastrá el dedo para caminar'], ['JOYSTICK DERECHO', 'Arrastrá hacia el enemigo: apunta y dispara solo'],
+    ['JOYSTICK IZQUIERDO', 'Arrastrá el dedo para caminar'],
+    ['JOYSTICK DERECHO', 'En vista de arriba: apunta y dispara. En primera y tercera: sólo mueve la mira'],
+    ['BOTÓN FUEGO', 'En primera y tercera persona: mantenelo apretado para disparar. No mueve la mira'],
     ['RECAR', 'Recargar'], ['ARMA', 'Cambiar de arma'], ['GRAN', 'Tirar granada'], ['CAJA', 'Reabastecer munición'], ['DRON · AÉREO · TORRE', 'Rachas de bajas (cuando se encienden)'],
   ] },
   { t: 'CONSEJOS', i: 'target', filas: [

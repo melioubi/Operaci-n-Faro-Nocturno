@@ -3,10 +3,14 @@ import { Icon } from './Icon.jsx';
 import { API } from './comun.js';
 
 const VISTAS = [
-  { id: 'arriba25', t: 'DESDE ARRIBA 2.5D', i: 'layers', d: 'Vista de arriba con paredes y árboles en relieve.' },
-  { id: 'tercera', t: 'TERCERA PERSONA', i: 'person_pin', d: 'Cámara detrás tuyo: mirás hacia donde apunta el soldado.' },
-  { id: 'primera', t: 'PRIMERA PERSONA', i: 'visibility', d: 'Ves por los ojos del soldado, con el arma en la mano.' },
+  { id: 'arriba25', t: 'DESDE ARRIBA 2.5D', i: 'layers', d: 'Vista de arriba con paredes y árboles en relieve. En la campaña, primera y tercera pasan a 3D.' },
+  { id: 'tercera', t: 'TERCERA PERSONA', i: 'person_pin', d: 'Cámara detrás tuyo. En la campaña es 3D, con lluvia, niebla y el haz del faro.' },
+  { id: 'primera', t: 'PRIMERA PERSONA', i: 'visibility', d: 'Ves por los ojos del operador, con el arma equipada en la mano.' },
   { id: 'clasica', t: 'CLÁSICA', i: 'map', d: 'La vista plana de siempre.' },
+];
+const CALIDAD = [
+  { id: 'baja', t: 'BAJA', i: 'smartphone', d: 'Para el celular: sin sombras y menos lluvia.' },
+  { id: 'alta', t: 'ALTA', i: 'desktop_windows', d: 'Sombras, más lluvia y más detalle. Gasta más batería.' },
 ];
 const MUSICAS = [
   { id: 'pistas', t: 'PISTAS REALES', d: 'Música grabada: oscura en el menú, metal en la partida' },
@@ -37,7 +41,15 @@ export function AjustesContenido({ f }) {
     <div className="flex flex-col gap-space-sm">
       <Titulo>VISTA DE LA CÁMARA</Titulo>
       <Opciones lista={VISTAS} valor={f.camara} onElegir={API.setCamara} />
-      <p className="font-label-sm text-label-sm text-on-surface-variant">Tip: en la partida apretá <b className="text-primary">V</b> para cambiar de vista. En primera y tercera persona, hacé clic en el juego para capturar el mouse (mirás moviendo el mouse; ESC lo suelta). En el celu, el joystick derecho gira y dispara.</p>
+      <p className="font-label-sm text-label-sm text-on-surface-variant">En la campaña, primera y tercera persona son 3D. El resto de los modos sigue en 2D hasta la próxima etapa. En la compu, clic captura el mouse para mirar y el clic izquierdo dispara. En el celular, el joystick derecho sólo mueve la mira y el botón FUEGO dispara.</p>
+      <Titulo color="bg-secondary">CALIDAD 3D</Titulo>
+      <Opciones lista={CALIDAD} valor={f.calidad || 'alta'} onElegir={API.setCalidad} />
+      <label className="flex items-center gap-space-sm bg-surface-container rounded-lg p-space-sm">
+        <Icon n="my_location" className="text-primary text-2xl" />
+        <span className="font-label-md text-label-md text-on-surface uppercase font-bold w-28">SENSIBILIDAD</span>
+        <input type="range" min="35" max="160" value={Math.round((f.sensibilidad || 0.7) * 100)} onChange={e => API.setSensibilidad(+e.target.value / 100)} className="flex-1 accent-[#f59e0b]" aria-label="Sensibilidad de la mira" />
+        <span className="font-label-md text-label-md text-primary w-10 text-right">{Math.round((f.sensibilidad || 0.7) * 100)}%</span>
+      </label>
       <Titulo color="bg-tertiary">MÚSICA EN EL MENÚ</Titulo>
       <Opciones lista={MUSICAS} valor={m.menu} onElegir={id => API.setMusica({ menu: id })} />
       <Titulo color="bg-error">MÚSICA EN LA PARTIDA</Titulo>

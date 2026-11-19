@@ -1,5 +1,6 @@
 import { ITEMS, evoNivel, ARMAS_BASE as ARMAS, CAMOS, NIVEL_MAX, RANGOS, rangoDe, xpTotal, nivelDeXp, statsArma, perksDe, CAMO_POR_ID, OPERADOR_POR_ID } from '../progreso/catalogo.js';
 import { perfil as PERFIL, equipoLocal, camoActivo, opActivo, ganarXp as ganarXpPerfil, darCreditos, sumarStat, sumarMaestria, suscribirPerfil, nivelPerfil, skinActiva, bajasSkin, acreditarSkins, remateActivo } from '../progreso/perfil.js';
+import { renderMundo, ocultarMundo } from './mundo3d.js';
 'use strict';
 /* =====================================================================
    OPERACIÓN FARO NOCTURNO
@@ -265,6 +266,7 @@ function setMusica(o) {
 
 // ---------- Mapa ----------
 let obstaculos = [], estaciones = [], portones = [], keepClear = [];
+let mapaFirma = 0;
 function addOb(x, y, w, h, tipo) { const o = { x, y, w, h, tipo, abierto: false }; obstaculos.push(o); return o; }
 const bloqueaBala = o => !o.abierto && o.tipo !== 'agua';
 
@@ -321,6 +323,7 @@ function construirMapa() {
    [2850, 540, 40, 12], [3300, 170, 12, 50], [3180, 520, 40, 12], [3420, 360, 12, 50]].forEach(([x, y, w, h]) => addOb(x, y, w, h, 'bolsas'));
   for (let i = 0; i < 20; i++) { const x = 2720 + R() * 260, y = 20 + R() * 700; if (libre(x, y, 18, 18, 24)) addOb(x, y, 18, 18, 'arbol'); }
   for (let i = 0; i < 6; i++) { const x = 3200 + R() * 260, y = 40 + R() * 160; if (libre(x, y, 26, 26, 30)) addOb(x, y, 26, 26, 'roca'); }
+  mapaFirma++;
 }
 
 function pintarMundo() {
@@ -978,7 +981,19 @@ function actualizarEnemigo(e, dt) {
 // ---------- Input ----------
 const teclas = {};
 const mouse = { x: VW / 2, y: VH / 2, abajo: false, dx: 0, dentro: false };
-const touch = { activo: false, mov: null, apu: null };
+const touch = { activo: false, mov: null, apu: null, disparo: false };
+const CALIDADES = ['baja', 'alta'];
+let calidad = 'alta';
+let sensMir = 0.7;
+try {
+  const g = localStorage.getItem('faro_cal');
+  if (CALIDADES.includes(g)) calidad = g;
+  else if (matchMedia('(pointer: coarse)').matches) calidad = 'baja';
+  const s = +localStorage.getItem('faro_sens');
+  if (s >= 0.35 && s <= 1.6) sensMir = s;
+} catch (e) { /* sin guardado */ }
+function setCalidad(c) { if (!CALIDADES.includes(c)) return; calidad = c; try { localStorage.setItem('faro_cal', c); } catch (e) { /* sin guardado */ } }
+function setSensibilidad(v) { sensMir = clamp(+v || 0.7, 0.35, 1.6); try { localStorage.setItem('faro_sens', String(sensMir)); } catch (e) { /* sin guardado */ } }
 const toVirtual = (cx, cy) => ({ x: (cx * DPR - OX) / ESC, y: (cy * DPR - OY) / ESC });
 
 addEventListener('keydown', e => {
@@ -988,7 +1003,7 @@ addEventListener('keydown', e => {
   Snd.init(); alPresionar(e.code);
 });
 addEventListener('keyup', e => { teclas[e.code] = false; });
-const alPerderFoco = () => { for (const k in teclas) teclas[k] = false; mouse.abajo = false; if (G.estado === 'jugando' && !MP()) G.estado = 'pausa'; };
+const alPerderFoco = () => { for (const k in teclas) teclas[k] = false; mouse.abajo = false; touch.disparo = false; if (G.estado === 'jugando' && !MP()) G.estado = 'pausa'; };
 addEventListener('blur', alPerderFoco);
 document.addEventListener('visibilitychange', () => { if (document.hidden) alPerderFoco(); });
 
@@ -1378,7 +1393,34 @@ function dibujarSoldado(g, x, y, ang, r, cuerpo, casco, largoArma, flash, paso) 
   g.restore();
 }
 
+const vista3d = () => G.modo === 'campania' && camGira() && !enMenu();
+function paquete3d() {
+  const yo = (MP() && YO) ? YO : P;
+  const cerca = (x, y) => dist(x, y, yo.x, yo.y) < 36;
+  return {
+    cam: camEf(), head: HEAD, shake: G.shake, zona: G.zona, calidad, mapaId: mapaFirma,
+    yo, col: colorJ(yo), skin: skinVisual(), acc: (equipoLocal().ar && equipoLocal().ar[yo.arma]) || {},
+    retroceso: G.retroceso || 0, disparoFlash: fogonazos.some((f) => cerca(f.x, f.y)),
+    nvg: !!(document.getElementById('c3d') && document.getElementById('c3d').classList.contains('nvg-activo')),
+    obstaculos, enemigos, balas, granadas, explosiones, items, heli,
+    otros: MP() ? jugadores.filter((j) => j !== yo).map((j) => ({ x: j.x, y: j.y, ang: j.ang, muerto: j.muerto, c: colorJ(j).c, h: colorJ(j).h, op: j.op })) : [],
+  };
+}
 function render() {
+  if (vista3d()) {
+    try {
+      const ok = renderMundo(paquete3d());
+      if (ok) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        pieDeRender(0, 0, { sinLluvia: true });
+        return;
+      }
+    } catch (err) {
+      if (!render.fallo3d) { render.fallo3d = true; console.error(err); }
+    }
+  }
+  ocultarMundo();
   const modo = camEf(), rot = modo === 'tercera', sh = G.shake;
   if (modo === 'primera') {
     lx = lx0; renderPrimera();
@@ -1581,8 +1623,8 @@ function render() {
   } else { ctx.imageSmoothingEnabled = false; ctx.drawImage(low, 0, 0, VW, VH, OX, OY, VW * ESC, VH * ESC); }
   pieDeRender(cx, cy);
 }
-function pieDeRender(cx, cy) {
-  dibujarLluvia();
+function pieDeRender(cx, cy, opts = {}) {
+  if (!opts.sinLluvia) dibujarLluvia();
   ctx.save(); ctx.translate(OX, OY); ctx.scale(ESC, ESC);
   ctx.beginPath(); ctx.rect(0, 0, VW, VH); ctx.clip();
   dibujarCapaMundo(cx, cy);
@@ -1601,6 +1643,11 @@ const camEf = () => (G && (G.estado === 'titulo' || G.estado === 'sala')) ? 'cla
 const camGira = () => { const m = camEf(); return m === 'tercera' || m === 'primera'; };
 function setCamara(m) { if (!CAMARAS.includes(m)) return; camModo = m; try { localStorage.setItem('faro_cam', m); } catch (e) { /* sin guardado */ } }
 function cambiarCamara() { setCamara(CAMARAS[(CAMARAS.indexOf(camModo) + 1) % CAMARAS.length]); G.toasts.push({ txt: 'VISTA: ' + NOMBRE_CAM[camModo], k: 0 }); }
+function preferirCam3d() {
+  if (camModo === 'primera' || camModo === 'tercera') return;
+  setCamara('tercera');
+  G.toasts.push({ txt: 'CAMPAÑA EN 3D · TERCERA PERSONA', k: 0 });
+}
 let bloqueoMouse = false;
 document.addEventListener('pointerlockchange', () => {
   bloqueoMouse = document.pointerLockElement === cv;
@@ -1610,11 +1657,11 @@ document.addEventListener('pointerlockchange', () => {
 function girar(dt) {
   if (!camGira()) { camAnt = null; mouse.dx = 0; return; }
   if (camAnt !== camEf() || !Number.isFinite(HEAD)) { camAnt = camEf(); HEAD = P.ang || 0; }
-  if (teclas.ArrowLeft) HEAD -= 2.6 * dt;
-  if (teclas.ArrowRight) HEAD += 2.6 * dt;
-  if (mouse.dx) { HEAD += mouse.dx * 0.0032; mouse.dx = 0; }
-  else if (!bloqueoMouse && !touch.activo && mouse.dentro) { const d = (mouse.x - VW / 2) / (VW / 2); if (Math.abs(d) > 0.12) HEAD += Math.sign(d) * (Math.abs(d) - 0.12) * 3 * dt; }
-  if (touch.apu) { const dx = touch.apu.x - touch.apu.ox; HEAD += clamp(dx / 26, -1.2, 1.2) * 2.8 * dt; }
+  if (teclas.ArrowLeft) HEAD -= 1.5 * sensMir * dt;
+  if (teclas.ArrowRight) HEAD += 1.5 * sensMir * dt;
+  if (mouse.dx) { HEAD += mouse.dx * 0.0016 * sensMir; mouse.dx = 0; }
+  else if (!bloqueoMouse && !touch.activo && mouse.dentro) { const d = (mouse.x - VW / 2) / (VW / 2); if (Math.abs(d) > 0.2) HEAD += Math.sign(d) * (Math.abs(d) - 0.2) * 1.1 * sensMir * dt; }
+  if (touch.apu) { const dx = touch.apu.x - touch.apu.ox; HEAD += clamp(dx / 48, -1, 1) * 1.5 * sensMir * dt; }
   HEAD = ((HEAD % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 }
 const PROJ = () => (VW / 2) / Math.tan(0.62);        // campo de visión ~71°
@@ -1887,7 +1934,8 @@ function dibujarJoysticks() {
     if (!s) { txt(l1, ox, oy - 40, 5, `rgb(${color})`, 'center'); txt(l2, ox, oy + 31, 4, '#c0c0c0', 'center'); }
   };
   stick(touch.mov, baseMov(), '84,221,252', 'CAMINAR', 'arrastrá el dedo');
-  stick(touch.apu, baseApu(), '255,180,171', 'APUNTAR Y DISPARAR', 'arrastrá: dispara solo');
+  const miraSolo = camGira();
+  stick(touch.apu, baseApu(), '255,180,171', miraSolo ? 'MOVER LA MIRA' : 'APUNTAR Y DISPARAR', miraSolo ? 'el botón FUEGO dispara' : 'arrastrá: dispara solo');
 }
 // Minimapa: se dibuja en un <canvas> chiquito de la interfaz
 let miniCv = null;
@@ -1964,6 +2012,7 @@ function avisoTodos(txt, color = '#ffffff') { G.toasts.push({ txt, color, k: 0 }
 
 // ---------- Entrada (teclado, mouse, táctil) convertida en "comandos" ----------
 function entradaLocal() {
+  if (G.estado !== 'jugando' || G.pausaLocal) touch.disparo = false;
   let ix = 0, iy = 0; const gi = camGira();
   if (teclas.KeyW || (!gi && teclas.ArrowUp)) iy--; if (teclas.KeyS || (!gi && teclas.ArrowDown)) iy++;
   if (teclas.KeyA || (!gi && teclas.ArrowLeft)) ix--; if (teclas.KeyD || (!gi && teclas.ArrowRight)) ix++;
@@ -1974,7 +2023,7 @@ function entradaLocal() {
   let ang = P.ang, fuego = mouse.abajo, ax = null, ay = null, apTouch = false;
   if (gi) {
     ang = HEAD; ax = P.x + Math.cos(HEAD) * 200; ay = P.y + Math.sin(HEAD) * 200;
-    if (touch.activo) fuego = !!(touch.apu && Math.hypot(touch.apu.x - touch.apu.ox, touch.apu.y - touch.apu.oy) > 6);
+    if (touch.activo) fuego = !!touch.disparo;
   } else if (touch.activo) {
     apTouch = true; fuego = false;
     // Joystick derecho: hacia donde lo empujás, apuntás Y disparás al mismo tiempo.
@@ -2486,7 +2535,9 @@ function tomarFoto() {
     estado: G.estado, modo: G.modo, fase: G.fase, mp: MP(), cargando: MP() && !YO, pausaLocal: !!G.pausaLocal, tiempo: G.tiempo, fps: Math.round(fps),
     info: menu ? null : infoFase(), obj: menu ? null : objetivoInfo(yo), pts: G.pts, bajas: G.bajas,
     nivel: nv, xp: PERFIL.xp, xpIni: xpTotal(nv), xpSig: nv >= NIVEL_MAX ? null : xpTotal(nv + 1), rango: rangoDe(nv),
-    camara: camModo, bloqueoMouse, musica: { ...musCfg }, rumbo: Math.round(((yo.ang * 180 / Math.PI) + 90 + 360) % 360), enemigos: enemigos.length, cola: G.cola.length,
+    camara: camModo, bloqueoMouse, musica: { ...musCfg }, calidad, sensibilidad: sensMir,
+    mundo3d: G.modo === 'campania' && (camModo === 'primera' || camModo === 'tercera'),
+    rumbo: Math.round(((yo.ang * 180 / Math.PI) + 90 + 360) % 360), enemigos: enemigos.length, cola: G.cola.length,
     hp: yoHp, maxhp: yo.maxhp, arma: yo.arma, armaNombre: w.nombre, cargador: w.cargador,
     armaInfo: { nombre: base.nombre, clase: base.clase, calibre: base.calibre, modo: base.modo, sil: !!w.sil, cargador: w.cargador },
     op: { nombre: op.n, rol: op.rol },
@@ -2556,8 +2607,8 @@ function dibujarRadar() {
 
 export const API = {
   // Los modos solos cierran la sala (si había una)
-  jugarCampania() { if (RED.activo) salirRed(); iniciarJuego(); publicar(); },
-  continuar() { if (RED.activo) salirRed(); continuarPartida(); publicar(); },
+  jugarCampania() { if (RED.activo) salirRed(); iniciarJuego(); preferirCam3d(); publicar(); },
+  continuar() { if (RED.activo) salirRed(); continuarPartida(); preferirCam3d(); publicar(); },
   jugarSupervivencia() { if (RED.activo) salirRed(); iniciarSupervivencia(); publicar(); },
   jugarTiro() { if (RED.activo) salirRed(); iniciarTiro(); publicar(); },
   // El anfitrión vuelve a la sala de espera sin cerrar la sala
@@ -2584,8 +2635,11 @@ export const API = {
   comprar(id) { const it = TIENDA.find(o => o.id === id); if (it && G.estado === 'tienda') { comprar(it); publicar(); } },
   cerrarTienda() { if (G.estado === 'tienda') { G.estado = 'jugando'; publicar(); } },
   setDificultad(i) { difIdx = clamp(i, 0, 2); try { localStorage.setItem('faro_dif', difIdx); } catch (e) {} publicar(); },
-  setCamara(m) { setCamara(m); },
-  setMusica(o) { setMusica(o); Snd.init(); },
+  setCamara(m) { setCamara(m); publicar(); },
+  setMusica(o) { setMusica(o); Snd.init(); publicar(); },
+  setCalidad(c) { setCalidad(c); publicar(); },
+  setSensibilidad(v) { setSensibilidad(v); publicar(); },
+  setDisparo(v) { touch.disparo = !!v; },
   setNombre(n) {
     n = limpiarNombre(n); try { localStorage.setItem('faro_nombre', n); } catch (e) {}
     if (RED.host && RED.sala[0]) RED.sala[0].nombre = n;
@@ -2615,6 +2669,7 @@ function loop(ahora) {
   actualizar(dt);
   const menu = enMenu();
   if (!menu) render();                      // en los menús la interfaz tapa el mundo: no gastamos batería dibujándolo
+  else ocultarMundo();
   fotoT -= dt; if (fotoT <= 0) { fotoT = menu ? 0.5 : 0.066; publicar(); }
   miniT -= dt; if (!menu && miniT <= 0) { miniT = 0.1; dibujarMinimapa(); dibujarRadar(); }
   requestAnimationFrame(loop);
