@@ -1393,7 +1393,7 @@ function dibujarSoldado(g, x, y, ang, r, cuerpo, casco, largoArma, flash, paso) 
   g.restore();
 }
 
-const vista3d = () => G.modo === 'campania' && camGira() && !enMenu();
+const vista3d = () => camGira() && !enMenu();
 function paquete3d() {
   const yo = (MP() && YO) ? YO : P;
   const cerca = (x, y) => dist(x, y, yo.x, yo.y) < 36;
@@ -2536,7 +2536,7 @@ function tomarFoto() {
     info: menu ? null : infoFase(), obj: menu ? null : objetivoInfo(yo), pts: G.pts, bajas: G.bajas,
     nivel: nv, xp: PERFIL.xp, xpIni: xpTotal(nv), xpSig: nv >= NIVEL_MAX ? null : xpTotal(nv + 1), rango: rangoDe(nv),
     camara: camModo, bloqueoMouse, musica: { ...musCfg }, calidad, sensibilidad: sensMir,
-    mundo3d: G.modo === 'campania' && (camModo === 'primera' || camModo === 'tercera'),
+    mundo3d: camModo === 'primera' || camModo === 'tercera',
     rumbo: Math.round(((yo.ang * 180 / Math.PI) + 90 + 360) % 360), enemigos: enemigos.length, cola: G.cola.length,
     hp: yoHp, maxhp: yo.maxhp, arma: yo.arma, armaNombre: w.nombre, cargador: w.cargador,
     armaInfo: { nombre: base.nombre, clase: base.clase, calibre: base.calibre, modo: base.modo, sil: !!w.sil, cargador: w.cargador },

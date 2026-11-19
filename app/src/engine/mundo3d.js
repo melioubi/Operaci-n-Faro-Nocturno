@@ -286,6 +286,17 @@ function construir(obstaculos, id) {
     suelo.userData.desechable = true;
     estatico.add(suelo);
   });
+  // Suelo de relleno: cubre todo lo que rodea al mapa (nunca se ve el vacío)
+  {
+    const W = 3600 * ESCALA + 160, H = 900 * ESCALA + 160, tx = conRepeticion('pasto', W / 3, H / 3);
+    const mat = material(0xffffff, { map: tx, bumpMap: tx, bumpScale: 1.6, roughness: 0.62, metalness: 0, color: 0x9aa890 });
+    mat.userData.mapaClon = true;
+    const borde = new THREE.Mesh(new THREE.PlaneGeometry(W, H), mat);
+    borde.rotation.x = -Math.PI / 2;
+    borde.position.set(aX(1800), -0.03, aZ(450));
+    borde.userData.desechable = true;
+    estatico.add(borde);
+  }
   const arboles = [];
   const rocas = [];
   for (const o of obstaculos) {
