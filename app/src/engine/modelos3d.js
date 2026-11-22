@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as clonarEsqueleto } from 'three/addons/utils/SkeletonUtils.js';
 
 // Los escenarios grandes se guardan ya simplificados (tala, restos, centinela, ruinas).
 const ARCHIVOS = {
@@ -104,6 +105,46 @@ export function tomarModelo(clave, medida) {
   return puesto;
 }
 
+// ---------- Modelos con esqueleto y animaciones (Mixamo / Meshy) ----------
+const ANIMADOS = { soldado: ['soldado-anim.glb', 'alto'], perroAnim: ['perro-anim.glb', 'largo'], heliAnim: ['heli-anim.glb', 'largo'] };
+const animados = {};
+export const animadoListo = (clave) => !!animados[clave];
+
+// Devuelve { grupo, mixer, clips } con el modelo ya a escala y apoyado en el piso
+export function tomarAnimado(clave, medida) {
+  const base = animados[clave];
+  if (!base) return null;
+  const raiz = clonarEsqueleto(base.escena);
+  const f = medida / base.medida;
+  raiz.scale.setScalar(f);
+  raiz.position.set(-base.centro.x * f, -base.minY * f, -base.centro.z * f);
+  raiz.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; if (o.material) o.material = o.material.clone(); } });
+  const grupo = new THREE.Group();
+  grupo.add(raiz);
+  const mixer = new THREE.AnimationMixer(raiz);
+  const acciones = {};
+  for (const c of base.clips) acciones[c.name] = mixer.clipAction(c);
+  return { grupo, raiz, mixer, acciones, actual: '' };
+}
+
+function cargarAnimados(alLlegar) {
+  const loader = new GLTFLoader();
+  for (const [clave, [archivo, modo]] of Object.entries(ANIMADOS)) {
+    loader.load(ruta(archivo), (gltf) => {
+      try {
+        gltf.scene.updateMatrixWorld(true);
+        const caja = new THREE.Box3().setFromObject(gltf.scene, true);
+        const tam = caja.getSize(new THREE.Vector3()), centro = caja.getCenter(new THREE.Vector3());
+        animados[clave] = {
+          escena: gltf.scene, clips: gltf.animations || [], minY: caja.min.y, centro,
+          medida: modo === 'alto' ? tam.y : Math.max(tam.x, tam.z, 0.001),
+        };
+        if (alLlegar) alLlegar();
+      } catch (err) { console.error('No se pudo preparar', clave, err); }
+    }, undefined, (err) => console.error('No se pudo cargar', clave, err));
+  }
+}
+
 export function mapaDe(clave) {
   const base = listos[clave];
   if (!base) return null;
@@ -119,6 +160,7 @@ export function mapaDe(clave) {
 export function cargarModelos(alTerminar) {
   if (pedido) return;
   pedido = true;
+  cargarAnimados(alTerminar);
   const loader = new GLTFLoader();
   const claves = Object.keys(ARCHIVOS);
   let faltan = claves.length;

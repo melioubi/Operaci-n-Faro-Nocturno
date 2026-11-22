@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { textura, conRepeticion, crearCielo, crearHazVisible } from './texturas3d.js';
-import { cargarModelos, claveOperador, mapaDe, modeloListo, tomarModelo } from './modelos3d.js';
+import { animadoListo, cargarModelos, claveOperador, mapaDe, modeloListo, tomarAnimado, tomarModelo } from './modelos3d.js';
 
 // Campo 3D de la campaña. El combate sigue en el mapa 2D; esta capa lo muestra
 // con los modelos cargados: operadores, enemigo, perro, armas, cabaña, faro y helicóptero.
@@ -156,6 +156,7 @@ function boot() {
   reloj = new THREE.Timer();
   addEventListener('resize', alRedimensionar);
   listo = true;
+  if (location.search.includes('debug')) window.__m3 = { THREE, get scene() { return scene; }, get jugador() { return jugador; }, get camera() { return camera; } };
   cargarModelos(modelosLlegaron);
   return true;
 }
@@ -408,11 +409,104 @@ function capsulaHumana() {
   return g;
 }
 
+// ---------- Animación de personajes con esqueleto ----------
+let dtFrame = 0.016;
+const CLIPS_HUMANO = { quieto: 'Walking', caminar: 'Walking', correr: 'Running', disparar: 'Run_and_Shoot' };
+const CLIPS_PERRO = { quieto: 'wolf_idle1', caminar: 'dog_walk', correr: 'dog_run', disparar: 'wolf_run_fight_forward' };
+const QP = new THREE.Quaternion();
+const QF = new THREE.Quaternion();
+const HUESO_MANO = /mixamorig:?RightHand$/;
+
+function reproducir(an, estado, clips, escala) {
+  const nombre = clips[estado];
+  const acc = an.acciones[nombre];
+  if (!acc) return;
+  if (an.estado !== estado) {
+    const previa = an.acciones[clips[an.estado]];
+    acc.reset();
+    acc.enabled = true;
+    acc.setEffectiveWeight(1);
+    acc.play();
+    if (previa && previa !== acc) acc.crossFadeFrom(previa, 0.18, false);
+    an.estado = estado;
+  }
+  acc.setEffectiveTimeScale(estado === 'quieto' ? 0 : escala);
+  if (estado === 'quieto') acc.time = 0;
+}
+
+// Calcula la velocidad real de la figura (por cuánto se movió) y elige la animación
+function animarFigura(figura, an, clips, vivo, dispara, pasosCam) {
+  const u = figura.userData;
+  const x = figura.position.x, z = figura.position.z;
+  let vel = 0;
+  if (u.prevX !== undefined) {
+    const d = Math.hypot(x - u.prevX, z - u.prevZ);
+    vel = d > 3 ? 0 : d / Math.max(dtFrame, 0.001);
+  }
+  u.prevX = x; u.prevZ = z;
+  an.vel = (an.vel || 0) * 0.7 + vel * 0.3;
+  let estado = 'quieto', escala = 1;
+  if (an.vel > 0.6) { estado = an.vel > pasosCam ? 'correr' : 'caminar'; escala = clamp(an.vel / (estado === 'correr' ? 7 : 3.2), 0.6, 2.2); }
+  if (dispara && vivo) { estado = 'disparar'; escala = 1; }
+  reproducir(an, estado, clips, escala);
+  an.mixer.update(dtFrame);
+}
+
+function animarHumano(figura, dispara) {
+  const an = figura.userData.humano.userData.anim;
+  if (!an || !figura.visible || !figura.userData.humano.visible) return;
+  animarFigura(figura, an, CLIPS_HUMANO, true, dispara, 7);
+  // el arma sigue a la mano, pero siempre apunta hacia donde mira el personaje
+  const arma = figura.userData.arma;
+  if (arma && arma.userData.enMano) {
+    figura.updateWorldMatrix(true, false);
+    arma.parent.updateWorldMatrix(true, false);
+    arma.parent.getWorldQuaternion(QP);
+    figura.getWorldQuaternion(QF);
+    arma.quaternion.copy(QP.invert().multiply(QF));
+  }
+}
+function animarPerro(figura) {
+  const an = figura.userData.perro.userData.anim;
+  if (!an || !figura.visible || !figura.userData.perro.visible) return;
+  animarFigura(figura, an, CLIPS_PERRO, false, false, 6);
+}
+
 function asegurarHumano(figura, clave, alto) {
   const humano = figura.userData.humano;
   const real = modeloListo(clave);
-  if (humano.userData.clave === clave && humano.userData.real === real) return;
+  const realAnim = (clave === 'faro' || clave === 'enemigo') && animadoListo('soldado');
+  if (humano.userData.clave === clave && humano.userData.real === (real || realAnim) && (!realAnim || humano.userData.anim)) return;
   vaciarGrupo(humano);
+  humano.userData.anim = null;
+  if ((clave === 'faro' || clave === 'enemigo') && animadoListo('soldado')) {
+    const an = tomarAnimado('soldado', alto);
+    humano.add(an.grupo);
+    humano.userData.anim = an;
+    if (clave === 'enemigo') an.raiz.traverse((o) => { if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(0.95, 0.62, 0.6); });
+    figura.userData.cuerpo = null;
+    figura.userData.casco = null;
+    const arma = new THREE.Group();
+    let mano = null;
+    an.raiz.traverse((o) => { if (!mano && o.isBone && HUESO_MANO.test(o.name)) mano = o; });
+    an.raiz.updateMatrixWorld(true);
+    if (mano) {
+      const ws = new THREE.Vector3();
+      mano.getWorldScale(ws);
+      mano.add(arma);
+      arma.scale.setScalar(1 / Math.max(ws.x, 1e-4));
+      arma.rotation.set(-Math.PI / 2, 0, 0);
+      arma.position.set(0, 0, 0);
+      arma.userData.enMano = true;
+    } else {
+      arma.position.set(0.28, alto * 0.58, 0.16);
+      humano.add(arma);
+    }
+    humano.userData.clave = clave;
+    humano.userData.real = true;
+    figura.userData.arma = arma;
+    return;
+  }
   const modelo = tomarModelo(clave, alto);
   if (modelo) {
     humano.add(modelo);
@@ -435,9 +529,15 @@ function asegurarHumano(figura, clave, alto) {
 function asegurarPerro(figura) {
   const perro = figura.userData.perro;
   const real = modeloListo('perro');
-  if (perro.userData.listo && perro.userData.real === real) return;
+  if (perro.userData.listo && perro.userData.real === (real || animadoListo('perroAnim')) && (!animadoListo('perroAnim') || perro.userData.anim)) return;
   vaciarGrupo(perro);
-  const modelo = tomarModelo('perro', 1.45);
+  perro.userData.anim = null;
+  let modelo = null;
+  if (animadoListo('perroAnim')) {
+    const an = tomarAnimado('perroAnim', 1.45);
+    modelo = an.grupo;
+    perro.userData.anim = an;
+  } else modelo = tomarModelo('perro', 1.45);
   if (modelo) perro.add(modelo);
   else {
     const cuerpo = new THREE.Mesh(new THREE.CapsuleGeometry(0.14, 0.45, 3, 6), material(0x6a4a2a));
@@ -486,8 +586,42 @@ function crearFigura() {
   return g;
 }
 
+// Rotor del helicóptero: gira los huesos de las aspas alrededor del eje del eje central
+const CENTRO_ROTOR = new THREE.Vector3(-0.76, 1.4, -0.01);
+function prepararRotor(raiz) {
+  raiz.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
+  const huesos = [];
+  raiz.traverse((o) => {
+    if (!o.isBone || !['Bone_029', 'Bone_031', 'Bone_033'].includes(o.name) || !o.parent) return;
+    const Mb = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    const Mp = new THREE.Matrix4().multiplyMatrices(inv, o.parent.matrixWorld);
+    huesos.push({ o, Mb, MpInv: Mp.clone().invert() });
+  });
+  return huesos;
+}
+const M_R = new THREE.Matrix4();
+const M_A = new THREE.Matrix4();
+const M_B = new THREE.Matrix4();
+function girarRotor(huesos, ang) {
+  const c = CENTRO_ROTOR;
+  M_R.makeTranslation(c.x, c.y, c.z).multiply(M_A.makeRotationY(ang)).multiply(M_B.makeTranslation(-c.x, -c.y, -c.z));
+  for (const h of huesos) {
+    const D = M_A.copy(M_R).multiply(h.Mb);
+    D.premultiply(h.MpInv).decompose(h.o.position, h.o.quaternion, h.o.scale);
+  }
+}
+
 function crearHeli() {
   const g = new THREE.Group();
+  if (animadoListo('heliAnim')) {
+    const an = tomarAnimado('heliAnim', 6.2);
+    g.add(an.grupo);
+    g.userData.rotor = { rotation: { y: 0 } };
+    g.userData.huesos = prepararRotor(an.raiz);
+    g.userData.real = true;
+    return g;
+  }
   const modelo = tomarModelo('heli', 6.2);
   const rotor = caja(0.08, 0.04, 3.4, 0xdddddd);
   rotor.position.y = modelo ? 1.7 : 0.5;
@@ -661,6 +795,7 @@ function actualizarJugador(datos) {
   pintarFigura(jugador, 'humano', col.c, col.h, yo.op || 'faro');
   sincronizarArma(jugador.userData.arma, yo.arma || 0, skin, acc);
   sincronizarArma(armaMano, yo.arma || 0, skin, acc);
+  animarHumano(jugador, !!datos.disparoFlash);
   const flashCuerpo = jugador.userData.arma.userData.flash;
   if (flashCuerpo) flashCuerpo.visible = !!datos.disparoFlash && datos.cam !== 'primera';
   armaClave = jugador.userData.arma.userData.clave || '';
@@ -689,7 +824,8 @@ function actualizarOtros(datos) {
     m.scale.setScalar(it.s);
     mirar(m, it.ang);
     pintarFigura(m, it.clase, it.c, it.h, it.op || null);
-    if (it.clase === 'humano') sincronizarArma(m.userData.arma, 1, { cuerpo: '#2a2a2e', acento: '#666' }, {});
+    if (it.clase === 'humano') { sincronizarArma(m.userData.arma, 1, { cuerpo: '#2a2a2e', acento: '#666' }, {}); animarHumano(m, false); }
+    else if (it.clase === 'perro') animarPerro(m);
   }
 }
 
@@ -755,10 +891,12 @@ function actualizarClima(datos, dt) {
   const fx = Math.cos(t), fz = Math.sin(t);
   haz.target.position.set(haz.position.x + fx * 36, 1.2, haz.position.z + fz * 36);
   for (const p of puertas) p.mesh.visible = !(p.ob && p.ob.abierto);
-  if (datos.heli) {
+  const hd = datos.heli || (window.__forzarHeli ? { x: datos.yo.x + 80, y: datos.yo.y - 10, alt: 20 } : null);
+  if (hd) {
     heliMesh.visible = true;
-    heliMesh.position.set(aX(datos.heli.x), 2 + (datos.heli.alt || 0) * 0.06, aZ(datos.heli.y));
+    heliMesh.position.set(aX(hd.x), 2 + (hd.alt || 0) * 0.06, aZ(hd.y));
     heliMesh.userData.rotor.rotation.y += dt * 18;
+    if (heliMesh.userData.huesos) girarRotor(heliMesh.userData.huesos, heliMesh.userData.rotor.rotation.y);
   } else heliMesh.visible = false;
   luna.position.set(aX(datos.yo.x) - 18, 40, aZ(datos.yo.y) + 10);
   luna.target.position.set(aX(datos.yo.x), 0, aZ(datos.yo.y));
@@ -809,6 +947,7 @@ export function renderMundo(datos) {
     if (ema > 0.024 && escalaDin > 0.55) { escalaDin = Math.max(0.55, escalaDin - 0.1); alRedimensionar(); }
     else if (ema < 0.0185 && escalaDin < 1) { escalaDin = Math.min(1, escalaDin + 0.05); alRedimensionar(); }
   }
+  dtFrame = dt;
   actualizarClima(datos, dt);
   actualizarJugador(datos);
   actualizarOtros(datos);
