@@ -144,6 +144,9 @@ export const SKINS = [
   skin('sk_hielo', 'CUERVO ÁRTICO', 1, { tipo: 'pase', n: 40, premium: true }, ['#5a6a7a', '#7a9ab0', '#a0c8e0', '#c8ecff', '#ffffff'], '#80e0ff', 'Escarcha que crece con cada baja.'),
   skin('sk_toxica', 'VÍBORA TÓXICA', 2, { tipo: 'pase', n: 70, premium: true }, ['#3a4a2a', '#4a7a2a', '#60b030', '#80e040', '#c0ff70'], '#80ff40', 'Veneno brillante en la escopeta.'),
   skin('sk_dragon', 'DRAGÓN DEL FARO', 1, { tipo: 'pase', n: 90, premium: true }, ['#4a2a2a', '#8a2020', '#c02020', '#ff4030', '#ffa060'], '#ff4040', 'La skin definitiva: escamas de fuego.'),
+  { ...skin('sk_m_smg', 'SUBFUSIL SILENCIADO', 0, { tipo: 'pase', n: 12 }, ['#3a3f48', '#4a525e', '#5a6676', '#7a8ca4', '#aac0dc'], '#9ec4ff', 'Modelo 3D propio con silenciador.'), modelo: 'armaSkinPistola' },
+  { ...skin('sk_m_rifle', 'FUSIL DE ASALTO TÁCTICO', 1, { tipo: 'pase', n: 33 }, ['#3a3a30', '#5a5a3a', '#7a7a44', '#a0a050', '#d0d070'], '#d0d070', 'Modelo 3D propio de fusil.'), modelo: 'armaSkinFusil' },
+  { ...skin('sk_m_esc', 'ESCOPETA DE COMBATE', 2, { tipo: 'pase', n: 55, premium: true }, ['#4a3a3a', '#6a4a3a', '#8a5a3a', '#b0683a', '#e08040'], '#e08040', 'Modelo 3D propio de escopeta.'), modelo: 'armaSkinEscopeta' },
   skin('sk_oro', 'FUSIL DORADO', 1, { tipo: 'tienda', precio: 120, moneda: 'fichas' }, ['#8a7a3a', '#b8a030', '#e0c030', '#ffd740', '#fff0a0'], '#ffe060', 'Oro macizo. Brilla más con cada fase.'),
 ];
 export const ITEMS = {};

@@ -1,6 +1,6 @@
 import { ITEMS, evoNivel, ARMAS_BASE as ARMAS, CAMOS, NIVEL_MAX, RANGOS, rangoDe, xpTotal, nivelDeXp, statsArma, perksDe, CAMO_POR_ID, OPERADOR_POR_ID } from '../progreso/catalogo.js';
 import { perfil as PERFIL, equipoLocal, camoActivo, opActivo, ganarXp as ganarXpPerfil, darCreditos, sumarStat, sumarMaestria, suscribirPerfil, nivelPerfil, skinActiva, bajasSkin, acreditarSkins, remateActivo } from '../progreso/perfil.js';
-import { renderMundo, ocultarMundo } from './mundo3d.js';
+import { renderMundo, ocultarMundo, HITOS } from './mundo3d.js';
 'use strict';
 /* =====================================================================
    OPERACIÓN FARO NOCTURNO
@@ -319,6 +319,8 @@ function construirMapa() {
   }
   // ZONA 4: el faro
   addOb(FARO.x - 32, FARO.y - 32, 64, 64, 'faro');
+  // Los objetos grandes del 3D (cabaña, ruinas, restos...) también son sólidos: no se atraviesan ni paran las balas
+  for (const [, x, y, medida] of HITOS) { const s = medida / 0.12 * 0.62; addOb(x - s / 2, y - s / 2, s, s, 'prop'); }
   [[3000, 180, 12, 60], [3000, 380, 12, 60], [3060, 420, 60, 12], [3240, 420, 60, 12], [2850, 300, 40, 12],
    [2850, 540, 40, 12], [3300, 170, 12, 50], [3180, 520, 40, 12], [3420, 360, 12, 50]].forEach(([x, y, w, h]) => addOb(x, y, w, h, 'bolsas'));
   for (let i = 0; i < 20; i++) { const x = 2720 + R() * 260, y = 20 + R() * 700; if (libre(x, y, 18, 18, 24)) addOb(x, y, 18, 18, 'arbol'); }
@@ -695,6 +697,25 @@ function apuntado(distMax) {
   if (d <= distMax) return { x: ax, y: ay };
   return { x: P.x + (ax - P.x) / d * distMax, y: P.y + (ay - P.y) / d * distMax };
 }
+// Cuchillo: golpe corto al frente (tecla F o botón CUCH). No gasta munición.
+function cuchillada() {
+  if (G.estado !== 'jugando' || P.oculto || P.muerto) return;
+  if ((P.cuchT || 0) > G.tiempo) return;
+  P.cuchT = G.tiempo + 0.7; P.cuchAnim = G.tiempo + 0.5;
+  Snd.play('hit');
+  for (const e of enemigos.slice()) {
+    if (e.muerto || e.T.estatico && G.modo !== 'tiro') continue;
+    const d = dist(P.x, P.y, e.x, e.y);
+    if (d > 30 + e.r) continue;
+    if (Math.abs(angDif(P.ang, Math.atan2(e.y - P.y, e.x - P.x))) > 1.1) continue;
+    if (!hayVision(P.x, P.y, e.x, e.y)) continue;
+    TIRADOR = P.id; golpearEnemigo(e, 80, null, 'arma');
+  }
+  if (G.modo === 'equipos') for (const o of jugadores) {
+    if (o === P || o.muerto || o.equipo === P.equipo || dist(P.x, P.y, o.x, o.y) > 32) continue;
+    const yo = P; P = o; herirJugador(70, yo.x, yo.y, yo.id); P = yo;
+  }
+}
 function tirarGranada() {
   if (G.estado !== 'jugando' || P.oculto) return;
   if (P.gran <= 0) { toast('Sin granadas', '#ff8080'); Snd.play('vacio'); return; }
@@ -1014,7 +1035,7 @@ function alPresionar(c) {
     case 'jugando':
       if (MP()) {
         if (c === 'KeyP' || c === 'Escape') { G.pausaLocal = !G.pausaLocal; break; }
-        const a = { Digit1: '1', Digit2: '2', Digit3: '3', KeyQ: 'q', KeyR: 'r', KeyG: 'g', KeyE: 'e', KeyZ: 'z', KeyX: 'x', KeyC: 'c' }[c];
+        const a = { Digit1: '1', Digit2: '2', Digit3: '3', KeyQ: 'q', KeyR: 'r', KeyG: 'g', KeyE: 'e', KeyZ: 'z', KeyX: 'x', KeyC: 'c', KeyF: 'f' }[c];
         if (a && !G.pausaLocal && YO && !YO.muerto) accion(a);
         break;
       }
@@ -1022,6 +1043,7 @@ function alPresionar(c) {
       if (c === 'KeyQ') cambiarArma(P.arma + 1);
       if (c === 'KeyR') recargar();
       if (c === 'KeyG') tirarGranada();
+      if (c === 'KeyF') cuchillada();
       if (c === 'KeyE') usarCaja();
       if (c === 'KeyZ') usarRacha('dron');
       if (c === 'KeyX') usarRacha('aereo');
@@ -1400,7 +1422,7 @@ function paquete3d() {
   return {
     cam: camEf(), head: HEAD, shake: G.shake, zona: G.zona, calidad, mapaId: mapaFirma,
     yo, col: colorJ(yo), skin: skinVisual(), acc: (equipoLocal().ar && equipoLocal().ar[yo.arma]) || {},
-    retroceso: G.retroceso || 0, disparoFlash: fogonazos.some((f) => cerca(f.x, f.y)),
+    retroceso: G.retroceso || 0, cuchillo: (yo.cuchAnim || 0) > G.tiempo, disparoFlash: fogonazos.some((f) => cerca(f.x, f.y)),
     nvg: !!(document.getElementById('c3d') && document.getElementById('c3d').classList.contains('nvg-activo')),
     obstaculos, enemigos, balas, granadas, explosiones, items, heli,
     otros: MP() ? jugadores.filter((j) => j !== yo).map((j) => ({ x: j.x, y: j.y, ang: j.ang, muerto: j.muerto, c: colorJ(j).c, h: colorJ(j).h, op: j.op })) : [],
@@ -1716,7 +1738,7 @@ function luzEn(t, k) {            // 0..1.1: noche + linterna delante
 }
 const skinVisual = () => {
   const id = skinActiva(P.arma); if (!id) return { cuerpo: '#3a3f48', acento: '#ffb35c' };
-  const s = ITEMS[id]; return { cuerpo: s.colores[evoNivel(bajasSkin(id)) - 1], acento: s.acento };
+  const s = ITEMS[id]; return { cuerpo: s.colores[evoNivel(bajasSkin(id)) - 1], acento: s.acento, modelo: s.modelo };
 };
 const trazaDe = b => { if (MP() && !(YO && b.id === YO.id)) return '#fff2b0'; const id = skinActiva(P.arma); return id ? ITEMS[id].acento : '#fff2b0'; };
 const REM_COL = { destello: ['#fff2b0', '#ffd040'], ceniza: ['#888', '#555', '#ddd'], rayo: ['#80e0ff', '#ffffff', '#40a0ff'], brasas: ['#ff8020', '#ff4010', '#ffd040'], toxico: ['#80ff40', '#40c020'] };
@@ -2077,12 +2099,12 @@ function recogerItems(j) {
     if (j === YO || !MP()) Snd.play('item');
   }
 }
-const ACCIONES = new Set(['1', '2', '3', 'q', 'r', 'g', 'e', 'z', 'x', 'c']);
+const ACCIONES = new Set(['1', '2', '3', 'q', 'r', 'g', 'e', 'z', 'x', 'c', 'f']);
 function hacerAccion(a) {
   switch (a) {
     case '1': cambiarArma(0); break; case '2': cambiarArma(1); break; case '3': cambiarArma(2); break;
     case 'q': cambiarArma(P.arma + 1); break; case 'r': recargar(); break; case 'g': tirarGranada(); break;
-    case 'e': usarCaja(); break; case 'z': usarRacha('dron'); break; case 'x': usarRacha('aereo'); break; case 'c': usarRacha('torreta'); break;
+    case 'e': usarCaja(); break; case 'f': cuchillada(); break; case 'z': usarRacha('dron'); break; case 'x': usarRacha('aereo'); break; case 'c': usarRacha('torreta'); break;
   }
 }
 // Botones y teclas pasan por acá: si sos invitado, la acción viaja al anfitrión

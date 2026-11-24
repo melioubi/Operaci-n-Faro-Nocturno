@@ -260,7 +260,7 @@ function BotonDisparo() {
 function BotonesTactiles({ f }) {
   const m = f.mun[f.arma] || { c: 0, res: 0 };
   const lista = [
-    { t: 'RECAR', a: 'r', alerta: m.c <= f.cargador * 0.25 && m.res !== 0 }, { t: 'GRAN', a: 'g' },
+    { t: 'RECAR', a: 'r', alerta: m.c <= f.cargador * 0.25 && m.res !== 0 }, { t: 'GRAN', a: 'g' }, { t: 'CUCH', a: 'f' },
     { t: 'ARMA', a: 'q', alerta: m.c === 0 && m.res === 0 }, { t: 'CAJA', a: 'e', ok: !!f.caja && f.caja.cd === 0 },
   ];
   return (

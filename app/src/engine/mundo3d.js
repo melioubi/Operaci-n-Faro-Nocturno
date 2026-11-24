@@ -18,6 +18,20 @@ const COLOR_TIPO = {
   pared: 0xb0a088, caja: 0x8a6840, bolsas: 0xa89870, tronco: 0x6e563a, bote: 0x4a7098, municion: 0x58703c, porton: 0xc04040,
 };
 
+// Objetos grandes del mapa: [modelo, x, y, medida en metros, giro]. El juego les pone colisión.
+export const HITOS = [
+  ['cabana', 520, 250, 9, 0.4],
+  ['madera', 640, 160, 3.4, 0.4],
+  ['metal', 760, 220, 2.6, 0.8],
+  ['restos', 340, 560, 22, 0.6],
+  ['tala', 1380, 420, 28, 0.8],
+  ['metal', 1500, 220, 2.8, 1.2],
+  ['centinela', 2280, 360, 12, 0.4],
+  ['madera', 2100, 180, 3.6, 0.6],
+  ['metal', 2480, 240, 2.8, 0.3],
+  ['ruinas', 2980, 560, 22, 1.1],
+  ['madera', 2920, 620, 3.2, 1.1],
+];
 const aX = (x) => x * ESCALA;
 const aZ = (y) => y * ESCALA;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -310,9 +324,9 @@ function construir(obstaculos, id) {
     else if (o.tipo === 'roca') rocas.push(o);
     else if (o.tipo === 'faro') ponerFaro(o);
     else if (o.tipo === 'tronco' && modeloListo('madera')) {
-      ponerProp('madera', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.6, (o.x % 5) * 0.4);
+      ponerProp('madera', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.2, (o.x % 5) * 0.4);
     } else if (o.tipo === 'bolsas' && modeloListo('metal')) {
-      ponerProp('metal', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.3, (o.y % 4) * 0.5);
+      ponerProp('metal', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.1, (o.y % 4) * 0.5);
     } else if (ALTURA[o.tipo]) {
       const alto = ALTURA[o.tipo];
       const clave = (o.tipo === 'caja' || o.tipo === 'tronco') ? 'madera' : (o.tipo === 'bolsas' || o.tipo === 'municion' || o.tipo === 'bote') ? 'metal' : null;
@@ -333,19 +347,7 @@ function construir(obstaculos, id) {
       if (o.tipo === 'porton') puertas.push({ mesh: m, ob: o });
     }
   }
-  if (hayCabana) ponerProp('cabana', 520, 250, 9, 0.4);
-  const hitos = [
-    ['madera', 640, 160, 3.4, 0.4],
-    ['metal', 760, 220, 2.6, 0.8],
-    ['restos', 340, 560, 22, 0.6],
-    ['tala', 1380, 420, 28, 0.8],
-    ['metal', 1500, 220, 2.8, 1.2],
-    ['centinela', 2280, 360, 12, 0.4],
-    ['madera', 2100, 180, 3.6, 0.6],
-    ['metal', 2480, 240, 2.8, 0.3],
-    ['ruinas', 2980, 560, 22, 1.1],
-    ['madera', 2920, 620, 3.2, 1.1],
-  ];
+  const hitos = HITOS;
   for (const [clave, x, y, medida, giro] of hitos) {
     if (modeloListo(clave)) ponerProp(clave, x, y, medida, giro);
   }
@@ -411,18 +413,19 @@ function capsulaHumana() {
 
 // ---------- Animación de personajes con esqueleto ----------
 let dtFrame = 0.016;
-const CLIPS_HUMANO = { quieto: 'Walking', caminar: 'Walking', correr: 'Running', disparar: 'Run_and_Shoot' };
+const CLIPS_HUMANO = { quieto: 'Walking', caminar: 'Walking', correr: 'Running', disparar: 'Run_and_Shoot', cuchillo: 'Left_Slash' };
 const CLIPS_PERRO = { quieto: 'wolf_idle1', caminar: 'dog_walk', correr: 'dog_run', disparar: 'wolf_run_fight_forward' };
 const QP = new THREE.Quaternion();
 const QF = new THREE.Quaternion();
+const ANIM_CLAVE = { faro: 'soldado', sombra: 'op_sombra', viper: 'op_viper', hielo: 'op_hielo', cobra: 'op_cobra', enemigo: 'enemigoAnim' };
 const HUESO_MANO = /mixamorig:?RightHand$/;
 
 function reproducir(an, estado, clips, escala) {
-  const nombre = clips[estado];
-  const acc = an.acciones[nombre];
+  const buscar = (e) => an.acciones[clips[e]] || an.acciones.Running || Object.values(an.acciones)[0];
+  const acc = buscar(estado);
   if (!acc) return;
   if (an.estado !== estado) {
-    const previa = an.acciones[clips[an.estado]];
+    const previa = an.estado ? buscar(an.estado) : null;
     acc.reset();
     acc.enabled = true;
     acc.setEffectiveWeight(1);
@@ -435,7 +438,7 @@ function reproducir(an, estado, clips, escala) {
 }
 
 // Calcula la velocidad real de la figura (por cuánto se movió) y elige la animación
-function animarFigura(figura, an, clips, vivo, dispara, pasosCam) {
+function animarFigura(figura, an, clips, vivo, dispara, pasosCam, cuchillo) {
   const u = figura.userData;
   const x = figura.position.x, z = figura.position.z;
   let vel = 0;
@@ -448,14 +451,15 @@ function animarFigura(figura, an, clips, vivo, dispara, pasosCam) {
   let estado = 'quieto', escala = 1;
   if (an.vel > 0.6) { estado = an.vel > pasosCam ? 'correr' : 'caminar'; escala = clamp(an.vel / (estado === 'correr' ? 7 : 3.2), 0.6, 2.2); }
   if (dispara && vivo) { estado = 'disparar'; escala = 1; }
+  if (cuchillo && an.acciones.Left_Slash) { estado = 'cuchillo'; escala = 2.2; }
   reproducir(an, estado, clips, escala);
   an.mixer.update(dtFrame);
 }
 
-function animarHumano(figura, dispara) {
+function animarHumano(figura, dispara, cuchillo) {
   const an = figura.userData.humano.userData.anim;
   if (!an || !figura.visible || !figura.userData.humano.visible) return;
-  animarFigura(figura, an, CLIPS_HUMANO, true, dispara, 7);
+  animarFigura(figura, an, CLIPS_HUMANO, true, dispara, 7, cuchillo);
   // el arma sigue a la mano, pero siempre apunta hacia donde mira el personaje
   const arma = figura.userData.arma;
   if (arma && arma.userData.enMano) {
@@ -475,15 +479,15 @@ function animarPerro(figura) {
 function asegurarHumano(figura, clave, alto) {
   const humano = figura.userData.humano;
   const real = modeloListo(clave);
-  const realAnim = (clave === 'faro' || clave === 'enemigo') && animadoListo('soldado');
+  const claveAnim = ANIM_CLAVE[clave];
+  const realAnim = !!claveAnim && animadoListo(claveAnim);
   if (humano.userData.clave === clave && humano.userData.real === (real || realAnim) && (!realAnim || humano.userData.anim)) return;
   vaciarGrupo(humano);
   humano.userData.anim = null;
-  if ((clave === 'faro' || clave === 'enemigo') && animadoListo('soldado')) {
-    const an = tomarAnimado('soldado', alto);
+  if (realAnim) {
+    const an = tomarAnimado(claveAnim, alto);
     humano.add(an.grupo);
     humano.userData.anim = an;
-    if (clave === 'enemigo') an.raiz.traverse((o) => { if (o.isMesh && o.material && o.material.color) o.material.color.setRGB(0.95, 0.62, 0.6); });
     figura.userData.cuerpo = null;
     figura.userData.casco = null;
     const arma = new THREE.Group();
@@ -586,30 +590,44 @@ function crearFigura() {
   return g;
 }
 
-// Rotor del helicóptero: gira los huesos de las aspas alrededor del eje del eje central
+// Rotor del helicóptero: las aspas (triángulos altos alrededor del eje) se separan en otra malla que gira
+// sola, así no se mueve nada del resto del cuerpo (trompa, cabina, cola).
 const CENTRO_ROTOR = new THREE.Vector3(-0.76, 1.4, -0.01);
-function prepararRotor(raiz) {
-  raiz.updateMatrixWorld(true);
-  const inv = new THREE.Matrix4().copy(raiz.matrixWorld).invert();
-  const huesos = [];
-  raiz.traverse((o) => {
-    if (!o.isBone || !['Bone_029', 'Bone_031', 'Bone_033'].includes(o.name) || !o.parent) return;
-    const Mb = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
-    const Mp = new THREE.Matrix4().multiplyMatrices(inv, o.parent.matrixWorld);
-    huesos.push({ o, Mb, MpInv: Mp.clone().invert() });
-  });
-  return huesos;
-}
-const M_R = new THREE.Matrix4();
-const M_A = new THREE.Matrix4();
-const M_B = new THREE.Matrix4();
-function girarRotor(huesos, ang) {
-  const c = CENTRO_ROTOR;
-  M_R.makeTranslation(c.x, c.y, c.z).multiply(M_A.makeRotationY(ang)).multiply(M_B.makeTranslation(-c.x, -c.y, -c.z));
-  for (const h of huesos) {
-    const D = M_A.copy(M_R).multiply(h.Mb);
-    D.premultiply(h.MpInv).decompose(h.o.position, h.o.quaternion, h.o.scale);
+function separarRotor(raiz) {
+  let piel = null;
+  raiz.traverse((o) => { if (!piel && o.isSkinnedMesh) piel = o; });
+  if (!piel || !piel.geometry.index) return null;
+  const geo = piel.geometry;
+  if (!geo.userData.idx0) geo.userData.idx0 = Array.from(geo.index.array);
+  const pos = geo.attributes.position, idx = geo.userData.idx0, c = CENTRO_ROTOR;
+  const cache = new Map();
+  const esRotor = (i) => {
+    let v = cache.get(i);
+    if (v === undefined) { v = pos.getY(i) > 1.36 && Math.hypot(pos.getX(i) - c.x, pos.getZ(i) - c.z) < 3.05; cache.set(i, v); }
+    return v;
+  };
+  const aspas = [], resto = [];
+  for (let k = 0; k < idx.length; k += 3) {
+    const a = idx[k], b = idx[k + 1], d = idx[k + 2];
+    (esRotor(a) && esRotor(b) && esRotor(d) ? aspas : resto).push(a, b, d);
   }
+  geo.setIndex(resto);
+  const gr = new THREE.BufferGeometry();
+  gr.setAttribute('position', geo.attributes.position);
+  if (geo.attributes.normal) gr.setAttribute('normal', geo.attributes.normal);
+  if (geo.attributes.uv) gr.setAttribute('uv', geo.attributes.uv);
+  gr.setIndex(aspas);
+  const soporte = new THREE.Group();
+  soporte.position.copy(piel.position); soporte.quaternion.copy(piel.quaternion); soporte.scale.copy(piel.scale);
+  const pivote = new THREE.Group();
+  pivote.position.copy(c);
+  const malla = new THREE.Mesh(gr, piel.material);
+  malla.position.set(-c.x, -c.y, -c.z);
+  malla.frustumCulled = false;
+  malla.castShadow = true;
+  pivote.add(malla); soporte.add(pivote);
+  piel.parent.add(soporte);
+  return pivote;
 }
 
 function crearHeli() {
@@ -618,7 +636,7 @@ function crearHeli() {
     const an = tomarAnimado('heliAnim', 6.2);
     g.add(an.grupo);
     g.userData.rotor = { rotation: { y: 0 } };
-    g.userData.huesos = prepararRotor(an.raiz);
+    g.userData.pivote = separarRotor(an.raiz);
     g.userData.real = true;
     return g;
   }
@@ -659,7 +677,8 @@ function ponerArma(grupo, tipo, colores, acc) {
   const cuerpo = colores.cuerpo || '#3a3f48';
   const acento = colores.acento || '#c8a060';
   const largo = tipo === 0 ? 0.42 : tipo === 2 ? 0.62 : 0.72;
-  const modelo = tomarModelo(ARMA_CLAVE[tipo] || 'fusil', largo);
+  const claveModelo = colores.modelo && modeloListo(colores.modelo) ? colores.modelo : (ARMA_CLAVE[tipo] || 'fusil');
+  const modelo = tomarModelo(claveModelo, largo);
   grupo.userData.real = !!modelo;
   if (modelo) {
     grupo.add(modelo);
@@ -714,13 +733,13 @@ function ponerArma(grupo, tipo, colores, acc) {
 }
 
 function claveArma(tipo, colores, acc) {
-  return `${tipo}|${colores.cuerpo}|${colores.acento}|${acc.boca || ''}|${acc.laser || ''}|${acc.optica || ''}|${acc.acople || ''}|${acc.municion || ''}|${acc.culata || ''}`;
+  return `${tipo}|${colores.modelo || ''}|${colores.cuerpo}|${colores.acento}|${acc.boca || ''}|${acc.laser || ''}|${acc.optica || ''}|${acc.acople || ''}|${acc.municion || ''}|${acc.culata || ''}`;
 }
 
 function sincronizarArma(grupo, tipo, colores, acc) {
   if (!grupo) return;
   const clave = claveArma(tipo, colores, acc);
-  const real = modeloListo(ARMA_CLAVE[tipo] || 'fusil');
+  const real = modeloListo(colores.modelo || ARMA_CLAVE[tipo] || 'fusil');
   if (grupo.userData.clave === clave && !!grupo.userData.real === real) return;
   vaciarGrupo(grupo);
   ponerArma(grupo, tipo, colores, acc);
@@ -795,7 +814,7 @@ function actualizarJugador(datos) {
   pintarFigura(jugador, 'humano', col.c, col.h, yo.op || 'faro');
   sincronizarArma(jugador.userData.arma, yo.arma || 0, skin, acc);
   sincronizarArma(armaMano, yo.arma || 0, skin, acc);
-  animarHumano(jugador, !!datos.disparoFlash);
+  animarHumano(jugador, !!datos.disparoFlash, !!datos.cuchillo);
   const flashCuerpo = jugador.userData.arma.userData.flash;
   if (flashCuerpo) flashCuerpo.visible = !!datos.disparoFlash && datos.cam !== 'primera';
   armaClave = jugador.userData.arma.userData.clave || '';
@@ -891,12 +910,12 @@ function actualizarClima(datos, dt) {
   const fx = Math.cos(t), fz = Math.sin(t);
   haz.target.position.set(haz.position.x + fx * 36, 1.2, haz.position.z + fz * 36);
   for (const p of puertas) p.mesh.visible = !(p.ob && p.ob.abierto);
-  const hd = datos.heli || (window.__forzarHeli ? { x: datos.yo.x + 80, y: datos.yo.y - 10, alt: 20 } : null);
+  const hd = datos.heli || (window.__forzarHeli ? { x: datos.yo.x + (window.__dxHeli || 80), y: datos.yo.y - 10, alt: window.__altHeli ?? 20 } : null);
   if (hd) {
     heliMesh.visible = true;
     heliMesh.position.set(aX(hd.x), 2 + (hd.alt || 0) * 0.06, aZ(hd.y));
     heliMesh.userData.rotor.rotation.y += dt * 18;
-    if (heliMesh.userData.huesos) girarRotor(heliMesh.userData.huesos, heliMesh.userData.rotor.rotation.y);
+    if (heliMesh.userData.pivote) heliMesh.userData.pivote.rotation.y = heliMesh.userData.rotor.rotation.y;
   } else heliMesh.visible = false;
   luna.position.set(aX(datos.yo.x) - 18, 40, aZ(datos.yo.y) + 10);
   luna.target.position.set(aX(datos.yo.x), 0, aZ(datos.yo.y));

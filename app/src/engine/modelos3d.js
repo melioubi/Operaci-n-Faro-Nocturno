@@ -14,6 +14,9 @@ const ARCHIVOS = {
   pistola: 'arma-pistola.glb',
   fusil: 'arma-fusil.glb',
   escopeta: 'arma-escopeta.glb',
+  armaSkinPistola: 'arma-skin-pistola.glb',
+  armaSkinFusil: 'arma-skin-fusil.glb',
+  armaSkinEscopeta: 'arma-skin-escopeta.glb',
   faroTorre: 'faro.glb',
   cabana: 'cabana.glb',
   heli: 'heli.glb',
@@ -29,7 +32,7 @@ const MODO = {
   faro: 'persona', sombra: 'persona', viper: 'persona', hielo: 'persona',
   cobra: 'persona', nova: 'persona', enemigo: 'persona',
   perro: 'largo', heli: 'largo',
-  pistola: 'arma', fusil: 'arma', escopeta: 'arma',
+  pistola: 'arma', fusil: 'arma', escopeta: 'arma', armaSkinPistola: 'arma', armaSkinFusil: 'arma', armaSkinEscopeta: 'arma',
   faroTorre: 'alto', cabana: 'prop', madera: 'prop', metal: 'panel',
   tala: 'prop', restos: 'prop', centinela: 'prop', ruinas: 'prop',
 };
@@ -65,7 +68,22 @@ function orientar(raiz, modo) {
   return giro;
 }
 
+// Los modelos riggeados que se usan quietos (cabaña, faro, armas) se pasan a malla normal
+function desforrar(escena) {
+  const lista = [];
+  escena.traverse((o) => { if (o.isSkinnedMesh) lista.push(o); });
+  for (const s of lista) {
+    const m = new THREE.Mesh(s.geometry, s.material);
+    m.name = s.name;
+    m.position.copy(s.position); m.quaternion.copy(s.quaternion); m.scale.copy(s.scale);
+    const padre = s.parent;
+    padre.add(m); padre.remove(s);
+  }
+  return escena;
+}
+
 function ajustar(raiz, modo) {
+  desforrar(raiz);
   const giro = orientar(raiz, modo);
   giro.updateMatrixWorld(true);
   const caja = new THREE.Box3().setFromObject(giro);
@@ -106,7 +124,11 @@ export function tomarModelo(clave, medida) {
 }
 
 // ---------- Modelos con esqueleto y animaciones (Mixamo / Meshy) ----------
-const ANIMADOS = { soldado: ['soldado-anim.glb', 'alto'], perroAnim: ['perro-anim.glb', 'largo'], heliAnim: ['heli-anim.glb', 'largo'] };
+const ANIMADOS = {
+  soldado: ['soldado-anim.glb', 'alto'], perroAnim: ['perro-anim.glb', 'largo'], heliAnim: ['heli-anim.glb', 'largo'],
+  op_sombra: ['op-sombra-anim.glb', 'alto'], op_viper: ['op-viper-anim.glb', 'alto'], op_hielo: ['op-hielo-anim.glb', 'alto'], op_cobra: ['op-cobra-anim.glb', 'alto'],
+  enemigoAnim: ['enemigo-anim.glb', 'alto'],
+};
 const animados = {};
 export const animadoListo = (clave) => !!animados[clave];
 
