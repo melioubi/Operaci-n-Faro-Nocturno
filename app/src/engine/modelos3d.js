@@ -14,6 +14,8 @@ const ARCHIVOS = {
   pistola: 'arma-pistola.glb',
   fusil: 'arma-fusil.glb',
   escopeta: 'arma-escopeta.glb',
+  granada: 'granada.glb',
+  cajaMuni: 'caja-municion.glb',
   armaSkinPistola: 'arma-skin-pistola.glb',
   armaSkinFusil: 'arma-skin-fusil.glb',
   armaSkinEscopeta: 'arma-skin-escopeta.glb',
@@ -32,14 +34,14 @@ const MODO = {
   faro: 'persona', sombra: 'persona', viper: 'persona', hielo: 'persona',
   cobra: 'persona', nova: 'persona', enemigo: 'persona',
   perro: 'largo', heli: 'largo',
-  pistola: 'arma', fusil: 'arma', escopeta: 'arma', armaSkinPistola: 'arma', armaSkinFusil: 'arma', armaSkinEscopeta: 'arma',
+  pistola: 'arma', fusil: 'arma', escopeta: 'arma', granada: 'prop', cajaMuni: 'prop', armaSkinPistola: 'arma', armaSkinFusil: 'arma', armaSkinEscopeta: 'arma',
   faroTorre: 'alto', cabana: 'prop', madera: 'prop', metal: 'panel',
   tala: 'prop', restos: 'prop', centinela: 'prop', ruinas: 'prop',
 };
 
 const OPERADOR = {
   faro: 'faro', sombra: 'sombra', viper: 'viper', hielo: 'hielo',
-  cobra: 'cobra', nova: 'nova', leyenda: 'faro', valkiria: 'nova',
+  cobra: 'cobra', nova: 'nova', leyenda: 'faro', valkiria: 'valkiria',
 };
 
 const listos = {};
@@ -69,6 +71,14 @@ function orientar(raiz, modo) {
 }
 
 // Los modelos riggeados que se usan quietos (cabaña, faro, armas) se pasan a malla normal
+// Algunos modelos llegan sin textura: se les pone un color táctico para que no salgan blancos o negros
+function pintarSinTextura(escena, color, metal) {
+  escena.traverse((o) => {
+    if (o.isMesh && !(o.material && o.material.map)) o.material = new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: metal });
+  });
+}
+const COLOR_SIN_TEXTURA = { granada: 0x46552c, cajaMuni: 0x4a5a2c, op_valkiria: 0x55645a };
+
 function desforrar(escena) {
   const lista = [];
   escena.traverse((o) => { if (o.isSkinnedMesh) lista.push(o); });
@@ -127,7 +137,7 @@ export function tomarModelo(clave, medida) {
 const ANIMADOS = {
   soldado: ['soldado-anim.glb', 'alto'], perroAnim: ['perro-anim.glb', 'largo'], heliAnim: ['heli-anim.glb', 'largo'],
   op_sombra: ['op-sombra-anim.glb', 'alto'], op_viper: ['op-viper-anim.glb', 'alto'], op_hielo: ['op-hielo-anim.glb', 'alto'], op_cobra: ['op-cobra-anim.glb', 'alto'],
-  enemigoAnim: ['enemigo-anim.glb', 'alto'],
+  enemigoAnim: ['enemigo-anim.glb', 'alto'], op_valkiria: ['op-valkiria-anim.glb', 'alto'],
 };
 const animados = {};
 export const animadoListo = (clave) => !!animados[clave];
@@ -154,6 +164,7 @@ function cargarAnimados(alLlegar) {
   for (const [clave, [archivo, modo]] of Object.entries(ANIMADOS)) {
     loader.load(ruta(archivo), (gltf) => {
       try {
+        if (COLOR_SIN_TEXTURA[clave]) pintarSinTextura(gltf.scene, COLOR_SIN_TEXTURA[clave], 0.2);
         gltf.scene.updateMatrixWorld(true);
         const caja = new THREE.Box3().setFromObject(gltf.scene, true);
         const tam = caja.getSize(new THREE.Vector3()), centro = caja.getCenter(new THREE.Vector3());
@@ -193,6 +204,7 @@ export function cargarModelos(alTerminar) {
   for (const clave of claves) {
     loader.load(ruta(ARCHIVOS[clave]), (gltf) => {
       try {
+        if (COLOR_SIN_TEXTURA[clave]) pintarSinTextura(gltf.scene, COLOR_SIN_TEXTURA[clave], 0.4);
         listos[clave] = ajustar(gltf.scene, MODO[clave]);
         if (clave === 'hielo') listos.enemigo = listos.hielo;
       } catch (err) {

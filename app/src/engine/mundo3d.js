@@ -327,6 +327,8 @@ function construir(obstaculos, id) {
       ponerProp('madera', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.2, (o.x % 5) * 0.4);
     } else if (o.tipo === 'bolsas' && modeloListo('metal')) {
       ponerProp('metal', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.1, (o.y % 4) * 0.5);
+    } else if (o.tipo === 'municion' && modeloListo('cajaMuni')) {
+      ponerProp('cajaMuni', o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * ESCALA * 1.15, 0.2);
     } else if (ALTURA[o.tipo]) {
       const alto = ALTURA[o.tipo];
       const clave = (o.tipo === 'caja' || o.tipo === 'tronco') ? 'madera' : (o.tipo === 'bolsas' || o.tipo === 'municion' || o.tipo === 'bote') ? 'metal' : null;
@@ -417,11 +419,13 @@ const CLIPS_HUMANO = { quieto: 'Walking', caminar: 'Walking', correr: 'Running',
 const CLIPS_PERRO = { quieto: 'wolf_idle1', caminar: 'dog_walk', correr: 'dog_run', disparar: 'wolf_run_fight_forward' };
 const QP = new THREE.Quaternion();
 const QF = new THREE.Quaternion();
-const ANIM_CLAVE = { faro: 'soldado', sombra: 'op_sombra', viper: 'op_viper', hielo: 'op_hielo', cobra: 'op_cobra', enemigo: 'enemigoAnim' };
+const ANIM_CLAVE = { faro: 'soldado', sombra: 'op_sombra', viper: 'op_viper', hielo: 'op_hielo', cobra: 'op_cobra', enemigo: 'enemigoAnim', valkiria: 'op_valkiria' };
 const HUESO_MANO = /mixamorig:?RightHand$/;
 
 function reproducir(an, estado, clips, escala) {
-  const buscar = (e) => an.acciones[clips[e]] || an.acciones.Running || Object.values(an.acciones)[0];
+  // si el modelo trae una animación de espera (Idle), se usa; si no, queda en la primera pose de caminar
+  const conIdle = clips === CLIPS_HUMANO && !!an.acciones.Idle;
+  const buscar = (e) => (e === 'quieto' && conIdle ? an.acciones.Idle : an.acciones[clips[e]] || an.acciones.Running || Object.values(an.acciones)[0]);
   const acc = buscar(estado);
   if (!acc) return;
   if (an.estado !== estado) {
@@ -433,8 +437,9 @@ function reproducir(an, estado, clips, escala) {
     if (previa && previa !== acc) acc.crossFadeFrom(previa, 0.18, false);
     an.estado = estado;
   }
-  acc.setEffectiveTimeScale(estado === 'quieto' ? 0 : escala);
-  if (estado === 'quieto') acc.time = 0;
+  const congelada = estado === 'quieto' && !conIdle && clips === CLIPS_HUMANO;
+  acc.setEffectiveTimeScale(congelada ? 0 : estado === 'quieto' ? 1 : escala);
+  if (congelada) acc.time = 0;
 }
 
 // Calcula la velocidad real de la figura (por cuánto se movió) y elige la animación
@@ -860,9 +865,10 @@ function actualizarProyectiles(datos) {
     m.position.set(aX(b.x), 1.15, aZ(b.y));
   }
   for (const g of datos.granadas) {
-    const m = tomar(granadasMesh, () => new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), material(0x4a6a3a)));
+    const m = tomar(granadasMesh, () => (modeloListo('granada') ? tomarModelo('granada', 0.34) : new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), material(0x4a6a3a))));
     m.position.set(aX(g.x), 0.35 + (g.z || 0) * 0.04, aZ(g.y));
-    m.material.color.set(g.enemiga ? 0x8a3a3a : 0x4a6a3a);
+    m.rotation.x += 0.25; m.rotation.z += 0.18;
+    if (m.material) m.material.color.set(g.enemiga ? 0x8a3a3a : 0x4a6a3a);
   }
   for (const e of datos.explosiones) {
     const t = clamp((e.k || 0) / 0.5, 0, 1);
